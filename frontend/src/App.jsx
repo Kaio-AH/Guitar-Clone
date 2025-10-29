@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Music, Upload, Play, Pause, RotateCcw, Zap, AlertCircle, Loader } from 'lucide-react';
+import { Music, Upload, Play, Pause, RotateCcw, Zap, AlertCircle, Loader, Flame } from 'lucide-react';
 
 const GuitarHeroGame = () => {
   const [audioFile, setAudioFile] = useState(null);
@@ -10,6 +10,7 @@ const GuitarHeroGame = () => {
   const [maxCombo, setMaxCombo] = useState(0);
   const [notes, setNotes] = useState([]);
   const [pressedKeys, setPressedKeys] = useState(new Set());
+  const [holdingKeys, setHoldingKeys] = useState(new Map());
   const [difficulty, setDifficulty] = useState('medium');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
@@ -17,6 +18,7 @@ const GuitarHeroGame = () => {
   const [accuracy, setAccuracy] = useState(100);
   const [notesHit, setNotesHit] = useState(0);
   const [notesMissed, setNotesMissed] = useState(0);
+  const [multiplier, setMultiplier] = useState(1);
   
   const audioRef = useRef(null);
   const animationRef = useRef(null);
@@ -24,16 +26,15 @@ const GuitarHeroGame = () => {
   const fileInputRef = useRef(null);
   const isTogglingRef = useRef(false);
 
-  // Configurações do jogo
+  // Configurações - CORES GUITARFLASH
   const LANES = ['A', 'S', 'D', 'F', 'J'];
-  const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
+  const COLORS = ['#22c55e', '#ef4444', '#eab308', '#3b82f6', '#f97316'];
   const NOTE_SPEED = 350;
   const HIT_ZONE = 60;
   const SPAWN_HEIGHT = -100;
   const TARGET_Y = 520;
   const BACKEND_URL = 'http://localhost:5000';
 
-  // Handler para upload de arquivo
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -52,18 +53,17 @@ const GuitarHeroGame = () => {
     setNotesHit(0);
     setNotesMissed(0);
     setAccuracy(100);
+    setMultiplier(1);
 
     try {
-      // Cria URL local para o áudio
       const audioUrl = URL.createObjectURL(file);
       setAudioFile(audioUrl);
 
-      // Envia para o backend para análise
       const formData = new FormData();
       formData.append('file', file);
       formData.append('difficulty', difficulty);
 
-      console.log(`Enviando arquivo para análise (dificuldade: ${difficulty})...`);
+      console.log(`📤 Enviando arquivo (${difficulty})...`);
 
       const response = await fetch(`${BACKEND_URL}/analyze`, {
         method: 'POST',
@@ -71,30 +71,28 @@ const GuitarHeroGame = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Erro na análise: ${response.status}`);
+        throw new Error(`Erro: ${response.status}`);
       }
 
       const data = await response.json();
 
       if (data.success) {
-        console.log(`✅ Análise completa! ${data.notes.length} notas geradas`);
-        console.log(`🎵 BPM: ${data.audio_info.tempo.toFixed(2)}`);
+        console.log(`✅ ${data.notes.length} notas (${data.audio_info.hold_notes_count} hold)`);
         
-        // Prepara as notas com posição inicial
         const preparedNotes = data.notes.map(note => ({
           ...note,
           y: SPAWN_HEIGHT,
           hit: false,
-          missed: false
+          missed: false,
+          holding: false,
+          holdProgress: 0
         }));
 
         setNotes(preparedNotes);
         notesRef.current = preparedNotes;
         setAudioInfo(data.audio_info);
         
-        // Configura o áudio IMEDIATAMENTE após análise
         if (audioRef.current && audioUrl) {
-          console.log('🎵 Configurando áudio com URL:', audioUrl);
           audioRef.current.src = audioUrl;
           audioRef.current.preload = 'auto';
           audioRef.current.load();
@@ -102,68 +100,31 @@ const GuitarHeroGame = () => {
         
         setIsAnalyzing(false);
       } else {
-        throw new Error(data.error || 'Erro desconhecido na análise');
+        throw new Error(data.error || 'Erro desconhecido');
       }
 
     } catch (error) {
-      console.error('Erro ao processar arquivo:', error);
-      setAnalysisError(`Erro: ${error.message}. Certifique-se que o backend está rodando em ${BACKEND_URL}`);
+      console.error('❌ Erro:', error);
+      setAnalysisError(`${error.message}. Backend rodando?`);
       setIsAnalyzing(false);
       setAudioFile(null);
     }
   };
 
-  // Inicializa o áudio - BACKUP caso não tenha sido configurado
   useEffect(() => {
     if (audioFile && audioRef.current && notes.length > 0 && !audioRef.current.src) {
-      console.log('🔄 Configurando áudio via useEffect...');
-      console.log('URL do áudio:', audioFile);
-      
       audioRef.current.src = audioFile;
       audioRef.current.preload = 'auto';
       audioRef.current.load();
     }
-
-    // Event listeners
-    if (audioRef.current) {
-      const handleLoaded = () => {
-        console.log('✅ Áudio pronto! Duration:', audioRef.current.duration);
-        console.log('ReadyState:', audioRef.current.readyState);
-      };
-      
-      const handleError = (e) => {
-        console.error('❌ Erro ao carregar áudio:', e);
-        console.error('Error code:', audioRef.current.error);
-      };
-
-      const handleCanPlay = () => {
-        console.log('✅ Can play! ReadyState:', audioRef.current.readyState);
-      };
-      
-      audioRef.current.addEventListener('loadeddata', handleLoaded);
-      audioRef.current.addEventListener('canplay', handleCanPlay);
-      audioRef.current.addEventListener('error', handleError);
-      
-      return () => {
-        if (audioRef.current) {
-          audioRef.current.removeEventListener('loadeddata', handleLoaded);
-          audioRef.current.removeEventListener('canplay', handleCanPlay);
-          audioRef.current.removeEventListener('error', handleError);
-        }
-      };
-    }
   }, [audioFile, notes]);
 
-  // Sistema de animação das notas - CORRIGIDO
   useEffect(() => {
-    if (!isPlaying || !audioRef.current) {
-      return;
-    }
+    if (!isPlaying || !audioRef.current) return;
 
     let lastTime = 0;
     
     const animate = (timestamp) => {
-      // Limita a taxa de atualização para ~60 FPS
       if (timestamp - lastTime < 16) {
         animationRef.current = requestAnimationFrame(animate);
         return;
@@ -176,13 +137,23 @@ const GuitarHeroGame = () => {
         return prevNotes.map(note => {
           if (note.hit || note.missed) return note;
           
-          // Calcula posição Y baseada no tempo real da música
           const timeDiff = currentTime - note.time;
           const newY = TARGET_Y + (timeDiff * NOTE_SPEED);
           
-          // Verifica se a nota passou da zona de acerto
-          if (newY > TARGET_Y + HIT_ZONE && !note.missed && !note.hit) {
+          if (note.type === 'hold' && note.holding) {
+            const endTime = note.time + note.duration;
+            const holdProgress = Math.min(1, (currentTime - note.time) / note.duration);
+            
+            if (currentTime >= endTime) {
+              return { ...note, hit: true, holdProgress: 1 };
+            }
+            
+            return { ...note, y: newY, holdProgress };
+          }
+          
+          if (newY > TARGET_Y + HIT_ZONE && !note.missed && !note.hit && !note.holding) {
             setCombo(0);
+            setMultiplier(1);
             setNotesMissed(prev => prev + 1);
             return { ...note, y: newY, missed: true };
           }
@@ -203,33 +174,35 @@ const GuitarHeroGame = () => {
     };
   }, [isPlaying]);
 
-  // Atualiza precisão
-  const updateAccuracy = (hits, misses) => {
-    const total = hits + misses;
-    if (total > 0) {
-      setAccuracy(Math.round((hits / total) * 100));
-    }
-  };
+  useEffect(() => {
+    if (combo >= 50) setMultiplier(4);
+    else if (combo >= 30) setMultiplier(3);
+    else if (combo >= 10) setMultiplier(2);
+    else setMultiplier(1);
+  }, [combo]);
 
-  // Sistema de detecção de teclas
   useEffect(() => {
     const handleKeyDown = (e) => {
       const key = e.key.toUpperCase();
-      if (LANES.includes(key) && !pressedKeys.has(key)) {
+      if (!LANES.includes(key)) return;
+      
+      if (!pressedKeys.has(key)) {
         setPressedKeys(prev => new Set([...prev, key]));
-        if (isPlaying) {
-          checkHit(key);
-        }
+        if (isPlaying) checkHit(key, 'down');
       }
     };
 
     const handleKeyUp = (e) => {
       const key = e.key.toUpperCase();
+      if (!LANES.includes(key)) return;
+      
       setPressedKeys(prev => {
         const newSet = new Set(prev);
         newSet.delete(key);
         return newSet;
       });
+      
+      if (isPlaying) checkHit(key, 'up');
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -241,58 +214,85 @@ const GuitarHeroGame = () => {
     };
   }, [pressedKeys, isPlaying]);
 
-  // Verifica se acertou alguma nota
-  const checkHit = (key) => {
+  const checkHit = (key, action) => {
     const laneIndex = LANES.indexOf(key);
     if (laneIndex === -1) return;
 
     setNotes(prevNotes => {
       let hitDetected = false;
+      
       const updatedNotes = prevNotes.map(note => {
-        if (note.lane === laneIndex && 
-            !note.hit && 
-            !note.missed && 
-            !hitDetected &&
-            Math.abs(note.y - TARGET_Y) < HIT_ZONE) {
+        if (hitDetected) return note;
+        if (note.lane !== laneIndex) return note;
+        if (note.hit || note.missed) return note;
+        
+        const distance = Math.abs(note.y - TARGET_Y);
+        
+        if (action === 'down' && distance < HIT_ZONE) {
           hitDetected = true;
           
-          // Calcula pontos baseado na precisão
-          const distance = Math.abs(note.y - TARGET_Y);
-          const precision = 1 - (distance / HIT_ZONE);
-          let multiplier = 1;
-          let rating = 'OK';
+          if (note.type === 'tap') {
+            const precision = 1 - (distance / HIT_ZONE);
+            let pointMultiplier = 1;
+            
+            if (precision > 0.9) pointMultiplier = 2;
+            else if (precision > 0.7) pointMultiplier = 1.5;
+            else if (precision > 0.5) pointMultiplier = 1.2;
+            
+            const points = Math.floor(100 * pointMultiplier * multiplier);
+            
+            setScore(prev => prev + points);
+            setCombo(prev => {
+              const newCombo = prev + 1;
+              setMaxCombo(current => Math.max(current, newCombo));
+              return newCombo;
+            });
+            setNotesHit(prev => prev + 1);
+            
+            return { ...note, hit: true };
+            
+          } else if (note.type === 'hold') {
+            console.log('🎹 Hold iniciada!');
+            setHoldingKeys(prev => new Map(prev).set(key, note.id));
+            return { ...note, holding: true };
+          }
+        }
+        
+        if (action === 'up' && note.type === 'hold' && note.holding) {
+          hitDetected = true;
           
-          if (precision > 0.9) {
-            multiplier = 2;
-            rating = 'PERFECT!';
-          } else if (precision > 0.7) {
-            multiplier = 1.5;
-            rating = 'GREAT!';
-          } else if (precision > 0.5) {
-            multiplier = 1.2;
-            rating = 'GOOD';
+          const currentTime = audioRef.current?.currentTime || 0;
+          const holdTime = currentTime - note.time;
+          const holdPercentage = Math.min(1, holdTime / note.duration);
+          
+          const holdPoints = Math.floor(200 * holdPercentage * multiplier);
+          
+          setScore(prev => prev + holdPoints);
+          
+          if (holdPercentage >= 0.9) {
+            setCombo(prev => {
+              const newCombo = prev + 2;
+              setMaxCombo(current => Math.max(current, newCombo));
+              return newCombo;
+            });
+            setNotesHit(prev => prev + 1);
+          } else if (holdPercentage >= 0.5) {
+            setCombo(prev => prev + 1);
+            setNotesHit(prev => prev + 1);
+          } else {
+            setCombo(0);
+            setMultiplier(1);
           }
           
-          const basePoints = 100;
-          const comboBonus = 1 + (combo * 0.1);
-          const points = Math.floor(basePoints * multiplier * comboBonus);
-          
-          setScore(prev => prev + points);
-          setCombo(prev => {
-            const newCombo = prev + 1;
-            setMaxCombo(current => Math.max(current, newCombo));
-            return newCombo;
-          });
-          setNotesHit(prev => {
-            const newHits = prev + 1;
-            updateAccuracy(newHits, notesMissed);
-            return newHits;
+          setHoldingKeys(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(key);
+            return newMap;
           });
           
-          console.log(`${rating} +${points} pontos`);
-          
-          return { ...note, hit: true };
+          return { ...note, hit: true, holdProgress: holdPercentage };
         }
+        
         return note;
       });
       
@@ -300,67 +300,29 @@ const GuitarHeroGame = () => {
     });
   };
 
-  // Controles de playback - COM TIMEOUT
   const togglePlay = () => {
-    // Previne cliques múltiplos
-    if (isTogglingRef.current) {
-      console.log('⚠️ Aguarde...');
-      return;
-    }
-
-    if (!audioRef.current || notes.length === 0) {
-      console.error('❌ Não é possível tocar');
-      return;
-    }
+    if (isTogglingRef.current || !audioRef.current || notes.length === 0) return;
 
     isTogglingRef.current = true;
 
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
-      console.log('⏸️ Pausado');
       isTogglingRef.current = false;
     } else {
-      console.log('▶️ Iniciando reprodução...');
-      console.log('Audio src:', audioRef.current.src);
-      console.log('ReadyState:', audioRef.current.readyState);
-      console.log('Duration:', audioRef.current.duration);
-      
-      // Timeout de segurança (5 segundos)
-      const timeout = setTimeout(() => {
-        console.error('⏱️ Timeout! Forçando liberação...');
-        isTogglingRef.current = false;
-        setAnalysisError('Timeout ao iniciar áudio. Tente novamente.');
-      }, 5000);
-      
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            clearTimeout(timeout);
             setIsPlaying(true);
-            console.log('✅ Tocando!');
             isTogglingRef.current = false;
           })
           .catch(err => {
-            clearTimeout(timeout);
-            console.error('❌ Erro:', err);
-            console.error('Tipo de erro:', err.name);
-            
-            if (err.name === 'NotAllowedError') {
-              setAnalysisError('Permissão negada. Clique novamente.');
-            } else if (err.name === 'NotSupportedError') {
-              setAnalysisError('Formato de áudio não suportado.');
-            } else {
-              setAnalysisError('Erro ao tocar. Tente recarregar a página.');
-            }
-            
+            console.error('❌', err);
+            setAnalysisError('Erro ao tocar');
             isTogglingRef.current = false;
           });
-      } else {
-        clearTimeout(timeout);
-        isTogglingRef.current = false;
       }
     }
   };
@@ -377,14 +339,17 @@ const GuitarHeroGame = () => {
     setNotesHit(0);
     setNotesMissed(0);
     setAccuracy(100);
+    setMultiplier(1);
+    setHoldingKeys(new Map());
     
-    if (audioInfo && notes.length > 0) {
-      // Reseta as notas para o estado inicial
+    if (notes.length > 0) {
       const resetNotes = notesRef.current.map(note => ({
         ...note,
         y: SPAWN_HEIGHT,
         hit: false,
-        missed: false
+        missed: false,
+        holding: false,
+        holdProgress: 0
       }));
       setNotes(resetNotes);
     }
@@ -402,20 +367,9 @@ const GuitarHeroGame = () => {
     }
   };
 
-  // Mudança de dificuldade
-  const handleDifficultyChange = (newDifficulty) => {
-    setDifficulty(newDifficulty);
-  };
-
-  // Calcula estatísticas do jogo
   const getActiveLanes = () => {
-    const difficultyLanes = {
-      'easy': 3,
-      'medium': 4,
-      'hard': 5,
-      'expert': 5
-    };
-    return difficultyLanes[difficulty] || 5;
+    const lanes = { easy: 3, medium: 4, hard: 5, expert: 5 };
+    return lanes[difficulty] || 5;
   };
 
   const activeLanes = getActiveLanes();
@@ -423,18 +377,17 @@ const GuitarHeroGame = () => {
   const displayColors = COLORS.slice(0, activeLanes);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-black text-white">
-      {/* Header */}
-      <div className="p-6 bg-black bg-opacity-50 backdrop-blur-sm border-b border-purple-500">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white">
+      <div className="p-6 bg-black bg-opacity-70 backdrop-blur-sm border-b border-purple-500">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <Music className="w-8 h-8 text-purple-400" />
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Guitar Hero AI
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  Guitar Hero v2
                 </h1>
-                <p className="text-xs text-gray-400 mt-1">Powered by Librosa + Python</p>
+                <p className="text-xs text-gray-400 mt-1">Com Hold Notes! 🎸</p>
               </div>
             </div>
             
@@ -446,19 +399,17 @@ const GuitarHeroGame = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-gray-400">Combo</div>
-                  <div className="text-2xl font-bold text-pink-400">{combo}x</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-gray-400">Precisão</div>
-                  <div className="text-2xl font-bold text-green-400">{accuracy}%</div>
+                  <div className="text-2xl font-bold text-pink-400 flex items-center gap-1">
+                    {combo}x
+                    {multiplier > 1 && <span className="text-sm text-orange-400">({multiplier}x)</span>}
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Informações da música */}
           {audioInfo && (
-            <div className="mt-4 p-3 bg-gray-800 bg-opacity-50 rounded-lg flex justify-between items-center">
+            <div className="mt-4 p-3 bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-lg border border-purple-500/30 flex justify-between items-center">
               <div className="flex items-center gap-6 text-sm">
                 <div>
                   <span className="text-gray-400">Música:</span>
@@ -469,12 +420,9 @@ const GuitarHeroGame = () => {
                   <span className="ml-2 font-semibold">{audioInfo.tempo.toFixed(0)}</span>
                 </div>
                 <div>
-                  <span className="text-gray-400">Duração:</span>
-                  <span className="ml-2 font-semibold">{Math.floor(audioInfo.duration / 60)}:{(audioInfo.duration % 60).toFixed(0).padStart(2, '0')}</span>
-                </div>
-                <div>
                   <span className="text-gray-400">Notas:</span>
                   <span className="ml-2 font-semibold">{audioInfo.notes_count}</span>
+                  <span className="ml-1 text-xs text-green-400">({audioInfo.hold_notes_count} hold)</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -486,7 +434,6 @@ const GuitarHeroGame = () => {
         </div>
       </div>
 
-      {/* Área de upload */}
       {!audioFile && (
         <div className="flex items-center justify-center min-h-[70vh] p-6">
           <div className="max-w-2xl w-full">
@@ -497,7 +444,7 @@ const GuitarHeroGame = () => {
                     <Loader className="w-20 h-20 text-purple-400 animate-spin" />
                     <div className="text-center">
                       <div className="text-2xl font-semibold mb-2">Analisando música...</div>
-                      <div className="text-gray-400">Detectando BPM, beats e gerando notas</div>
+                      <div className="text-gray-400">Detectando hold notes</div>
                     </div>
                   </>
                 ) : (
@@ -506,7 +453,6 @@ const GuitarHeroGame = () => {
                     <div className="text-center">
                       <div className="text-2xl font-semibold mb-2">Upload uma música</div>
                       <div className="text-sm text-gray-400">MP3, WAV, OGG, FLAC, M4A</div>
-                      <div className="text-xs text-gray-500 mt-2">Máximo 50MB</div>
                     </div>
                   </>
                 )}
@@ -521,7 +467,6 @@ const GuitarHeroGame = () => {
               />
             </label>
 
-            {/* Seletor de dificuldade */}
             <div className="mt-8">
               <div className="text-center mb-4">
                 <div className="text-sm text-gray-400 mb-2">Selecione a dificuldade</div>
@@ -530,11 +475,11 @@ const GuitarHeroGame = () => {
                 {['easy', 'medium', 'hard', 'expert'].map(level => (
                   <button
                     key={level}
-                    onClick={() => handleDifficultyChange(level)}
+                    onClick={() => setDifficulty(level)}
                     disabled={isAnalyzing}
                     className={`py-3 px-4 rounded-lg font-semibold uppercase text-sm transition-all ${
                       difficulty === level
-                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50'
+                        ? 'bg-purple-600 text-white shadow-lg'
                         : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                     } ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
@@ -544,7 +489,6 @@ const GuitarHeroGame = () => {
               </div>
             </div>
 
-            {/* Erro */}
             {analysisError && (
               <div className="mt-6 p-4 bg-red-900 bg-opacity-50 border border-red-500 rounded-lg flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
@@ -552,29 +496,25 @@ const GuitarHeroGame = () => {
               </div>
             )}
 
-            {/* Instruções */}
-            <div className="mt-8 p-6 bg-gray-800 bg-opacity-30 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-purple-300">ℹ️ Como funciona</h3>
+            <div className="mt-8 p-6 bg-gradient-to-br from-purple-900/20 to-pink-900/20 rounded-lg border border-purple-500/30">
+              <h3 className="text-lg font-semibold mb-3 text-purple-300">🎮 Novidades v2</h3>
               <ul className="text-sm text-gray-300 space-y-2">
-                <li>• O backend Python analisa sua música usando Librosa</li>
-                <li>• Detecta BPM, beats e onsets automaticamente</li>
-                <li>• Gera notas sincronizadas com a música</li>
-                <li>• Quanto maior a dificuldade, mais notas aparecem</li>
+                <li>• <strong>Hold Notes</strong> - Segure as teclas!</li>
+                <li>• <strong>Cores GuitarFlash</strong> - Verde, Vermelho, Amarelo, Azul, Laranja</li>
+                <li>• <strong>Multiplicador 4x</strong> - Combo aumenta pontos</li>
+                <li>• <strong>Detecção automática</strong> de notas sustentadas</li>
               </ul>
             </div>
           </div>
         </div>
       )}
 
-      {/* Área do jogo */}
       {audioFile && notes.length > 0 && (
         <div className="relative max-w-7xl mx-auto mt-8 px-6 pb-12">
-          {/* Controles */}
           <div className="flex justify-center gap-4 mb-8">
             <button
               onClick={togglePlay}
-              disabled={isTogglingRef.current}
-              className="flex items-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-semibold transition-all shadow-lg"
             >
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
               {isPlaying ? 'Pausar' : 'Jogar'}
@@ -588,55 +528,54 @@ const GuitarHeroGame = () => {
             </button>
             <button
               onClick={newSong}
-              className="flex items-center gap-2 px-6 py-3 bg-pink-600 hover:bg-pink-700 rounded-lg font-semibold transition-colors"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 rounded-lg font-semibold transition-all"
             >
               <Upload className="w-5 h-5" />
-              Nova Música
+              Nova
             </button>
           </div>
 
-          {/* Estatísticas */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg text-center">
+          <div className="grid grid-cols-5 gap-4 mb-6">
+            <div className="bg-gradient-to-br from-green-900/30 to-green-800/30 p-4 rounded-lg text-center border border-green-500/30">
               <div className="text-xs text-gray-400 mb-1">Acertos</div>
               <div className="text-2xl font-bold text-green-400">{notesHit}</div>
             </div>
-            <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg text-center">
+            <div className="bg-gradient-to-br from-red-900/30 to-red-800/30 p-4 rounded-lg text-center border border-red-500/30">
               <div className="text-xs text-gray-400 mb-1">Erros</div>
               <div className="text-2xl font-bold text-red-400">{notesMissed}</div>
             </div>
-            <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg text-center">
+            <div className="bg-gradient-to-br from-orange-900/30 to-orange-800/30 p-4 rounded-lg text-center border border-orange-500/30">
               <div className="text-xs text-gray-400 mb-1">Max Combo</div>
               <div className="text-2xl font-bold text-orange-400">{maxCombo}x</div>
             </div>
-            <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg text-center">
-              <div className="text-xs text-gray-400 mb-1">Total Notas</div>
+            <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/30 p-4 rounded-lg text-center border border-purple-500/30">
+              <div className="text-xs text-gray-400 mb-1">Multiplicador</div>
+              <div className="text-2xl font-bold text-purple-400 flex items-center justify-center gap-1">
+                {multiplier}x
+                {multiplier >= 4 && <Flame className="w-5 h-5 text-orange-500" />}
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/30 p-4 rounded-lg text-center border border-blue-500/30">
+              <div className="text-xs text-gray-400 mb-1">Total</div>
               <div className="text-2xl font-bold text-blue-400">{notes.length}</div>
             </div>
           </div>
 
-          {/* Canvas do jogo */}
-          <div className="relative h-[600px] bg-black bg-opacity-50 rounded-xl overflow-hidden border-4 border-purple-500 shadow-2xl">
-            {/* Lanes */}
+          <div className="relative h-[600px] bg-gradient-to-b from-gray-900 to-black rounded-xl overflow-hidden border-4 border-purple-500 shadow-2xl">
             <div className="absolute inset-0 flex">
               {displayLanes.map((lane, index) => (
                 <div
                   key={lane}
-                  className="flex-1 border-r border-gray-700 last:border-r-0 relative transition-all duration-100"
+                  className="flex-1 border-r-2 border-gray-800 last:border-r-0 relative transition-all duration-100"
                   style={{
-                    backgroundColor: pressedKeys.has(lane) 
-                      ? `${displayColors[index]}30` 
-                      : 'transparent'
+                    backgroundColor: pressedKeys.has(lane) ? `${displayColors[index]}30` : 'transparent'
                   }}
                 >
-                  {/* Linhas guia */}
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-b from-gray-600 to-transparent opacity-30" />
-                  <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-t from-gray-600 to-transparent opacity-30" />
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-b from-gray-700 to-transparent opacity-50" />
                 </div>
               ))}
             </div>
 
-            {/* Zona de acerto */}
             <div 
               className="absolute inset-x-0 h-24 border-y-4 border-yellow-400 bg-yellow-400 bg-opacity-10 z-10"
               style={{ top: `${TARGET_Y - HIT_ZONE/2}px` }}
@@ -646,7 +585,7 @@ const GuitarHeroGame = () => {
                   <div key={lane} className="flex-1 flex items-center justify-center border-r border-yellow-400 last:border-r-0">
                     <div 
                       className={`text-5xl font-bold transition-all duration-100 ${
-                        pressedKeys.has(lane) ? 'scale-125 text-white' : 'text-gray-600'
+                        pressedKeys.has(lane) ? 'scale-125 text-white' : 'text-gray-700'
                       }`}
                     >
                       {lane}
@@ -656,64 +595,163 @@ const GuitarHeroGame = () => {
               </div>
             </div>
 
-            {/* Notas */}
-            {notes.map(note => (
-              !note.hit && !note.missed && note.y > SPAWN_HEIGHT && note.y < 650 && note.lane < activeLanes && (
-                <div
-                  key={note.id}
-                  className="absolute transition-opacity duration-150"
-                  style={{
-                    top: `${note.y}px`,
-                    left: `${(note.lane / activeLanes) * 100}%`,
-                    width: `${100 / activeLanes}%`,
-                    opacity: note.hit ? 0 : 1,
-                    zIndex: 5
-                  }}
-                >
-                  <div 
-                    className="mx-2 h-14 rounded-lg shadow-lg border-2 border-white border-opacity-30"
-                    style={{
-                      backgroundColor: displayColors[note.lane],
-                      boxShadow: `0 0 25px ${displayColors[note.lane]}`
-                    }}
-                  />
-                </div>
-              )
-            ))}
+            {notes.map(note => {
+              if (note.hit || note.missed) return null;
+              if (note.y < SPAWN_HEIGHT || note.y > 650) return null;
+              if (note.lane >= activeLanes) return null;
 
-            {/* Overlay quando pausado */}
+              const noteColor = displayColors[note.lane];
+              const laneWidth = 100 / activeLanes;
+              const laneLeft = (note.lane / activeLanes) * 100;
+
+              return (
+                <div key={note.id}>
+                  {/* CAUDA DA HOLD NOTE - MUITO MAIS VISÍVEL */}
+                  {note.type === 'hold' && (
+                    <div
+                      className="absolute"
+                      style={{
+                        top: `${note.y + 56}px`, // Começa logo abaixo da bolinha
+                        left: `${laneLeft}%`,
+                        width: `${laneWidth}%`,
+                        height: `${note.duration * NOTE_SPEED}px`,
+                        zIndex: 4
+                      }}
+                    >
+                      <div 
+                        className="mx-4 relative"
+                        style={{
+                          height: '100%',
+                          background: note.holding 
+                            ? `linear-gradient(to bottom, ${noteColor}FF, ${noteColor}CC, ${noteColor}99)` 
+                            : `linear-gradient(to bottom, ${noteColor}DD, ${noteColor}AA, ${noteColor}77)`,
+                          border: `4px solid ${noteColor}`,
+                          borderRadius: '8px',
+                          boxShadow: note.holding 
+                            ? `0 0 40px ${noteColor}, inset 0 0 30px ${noteColor}80`
+                            : `0 0 20px ${noteColor}80, inset 0 0 20px ${noteColor}40`,
+                          opacity: note.holding ? 1 : 0.9
+                        }}
+                      >
+                        {/* Listras internas para dar textura */}
+                        <div className="absolute inset-0 flex flex-col justify-around opacity-30">
+                          {[...Array(Math.max(3, Math.floor(note.duration * 3)))].map((_, i) => (
+                            <div 
+                              key={i} 
+                              className="h-1 bg-white"
+                              style={{ marginLeft: '2px', marginRight: '2px' }}
+                            />
+                          ))}
+                        </div>
+                        
+                        {/* Barra de progresso para hold notes sendo seguradas */}
+                        {note.holding && note.holdProgress > 0 && (
+                          <div 
+                            className="absolute inset-0 bg-white opacity-30"
+                            style={{
+                              height: `${note.holdProgress * 100}%`,
+                              transition: 'height 0.05s linear'
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* BOLINHA DA NOTA (CÍRCULO GUITARFLASH STYLE) */}
+                  <div
+                    className="absolute flex items-center justify-center"
+                    style={{
+                      top: `${note.y}px`,
+                      left: `${laneLeft}%`,
+                      width: `${laneWidth}%`,
+                      height: '56px',
+                      zIndex: 5
+                    }}
+                  >
+                    <div 
+                      className="relative"
+                      style={{
+                        width: '80%',
+                        height: '56px',
+                        maxWidth: '70px'
+                      }}
+                    >
+                      {/* Círculo principal */}
+                      <div
+                        className="absolute inset-0 rounded-full"
+                        style={{
+                          backgroundColor: noteColor,
+                          boxShadow: `
+                            0 0 40px ${noteColor}, 
+                            0 0 20px ${noteColor},
+                            0 4px 15px rgba(0,0,0,0.5),
+                            inset 0 -8px 15px rgba(0,0,0,0.3),
+                            inset 0 8px 15px rgba(255,255,255,0.3)
+                          `,
+                          border: '4px solid white',
+                          transform: pressedKeys.has(displayLanes[note.lane]) ? 'scale(0.9)' : 'scale(1)',
+                          transition: 'transform 0.1s'
+                        }}
+                      />
+                      
+                      {/* Brilho interno */}
+                      <div
+                        className="absolute rounded-full"
+                        style={{
+                          top: '15%',
+                          left: '20%',
+                          width: '40%',
+                          height: '30%',
+                          background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%)',
+                          filter: 'blur(3px)'
+                        }}
+                      />
+                      
+                      {/* Indicador de hold note no centro */}
+                      {note.type === 'hold' && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div 
+                            className="w-6 h-6 rounded-full border-4 border-white"
+                            style={{
+                              backgroundColor: note.holding ? 'white' : 'transparent',
+                              boxShadow: note.holding ? '0 0 10px white' : 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
             {!isPlaying && (
               <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center z-20">
                 <div className="text-center">
                   <Play className="w-20 h-20 mx-auto mb-4 text-purple-400" />
-                  <div className="text-2xl font-bold">Clique em Jogar para começar</div>
+                  <div className="text-2xl font-bold">Clique em Jogar!</div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Instruções */}
           <div className="mt-6 text-center text-gray-400">
             <p className="text-lg">
-              Use as teclas{' '}
-              <span className="font-bold text-white">
-                {displayLanes.join(' ')}
-              </span>
-              {' '}para tocar as notas
+              Use <span className="font-bold text-white">{displayLanes.join(' ')}</span> para tocar
             </p>
             <p className="text-sm mt-2">
-              Pressione quando as notas chegarem na zona amarela! Quanto mais preciso, mais pontos!
+              Segure as teclas para hold notes! 🎹
             </p>
           </div>
         </div>
       )}
 
-      {/* Áudio invisível */}
       <audio 
         ref={audioRef} 
         onEnded={() => {
           setIsPlaying(false);
-          console.log('🏁 Música finalizada!');
+          console.log('🏁 Fim!');
         }}
       />
     </div>
