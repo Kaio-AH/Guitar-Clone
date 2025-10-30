@@ -1,13 +1,19 @@
 """
-Guitar Hero Backend - v2
-Sistema de análise de áudio com NOTAS LONGAS (hold notes)
-Estilo GuitarFlash
+Guitar Hero Backend - v3
+Sistema com Spotify + YouTube
+Busca músicas no Spotify e baixa áudio do YouTube
 
 Requisitos:
-pip install flask flask-cors librosa numpy soundfile
+pip install flask flask-cors librosa numpy soundfile spotipy yt-dlp
+
+Configuração:
+1. Crie um app em: https://developer.spotify.com/dashboard
+2. Adicione Redirect URI: http://127.0.0.1:5000/callback
+3. Copie Client ID e Client Secret
+4. Cole abaixo nas variáveis SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET
 
 Uso:
-python guitar_hero_backend.py
+python guitar_hero_backend_v3.py
 """
 
 from flask import Flask, request, jsonify
@@ -18,17 +24,44 @@ import os
 import json
 from werkzeug.utils import secure_filename
 import tempfile
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import yt_dlp
+import re
 
 app = Flask(__name__)
 CORS(app)
 
-# Configurações
+# ============================================================
+# CONFIGURAÇÃO DO SPOTIFY - ADICIONE SUAS CREDENCIAIS AQUI!
+# ============================================================
+SPOTIFY_CLIENT_ID = '93c97ca549a14093875c81df94b05455'
+SPOTIFY_CLIENT_SECRET = '5c7e7aa7d32041e397f6a1fb15f669ed'
+
+# Configurações gerais
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'flac', 'm4a'}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = 50 * 1024 * 1024
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+# Inicializa Spotify Client
+try:
+    if SPOTIFY_CLIENT_ID != 'SEU_CLIENT_ID_AQUI':
+        spotify = SpotifyClientCredentials(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET
+        )
+        sp = spotipy.Spotify(client_credentials_manager=spotify)
+        SPOTIFY_ENABLED = True
+        print("✅ Spotify API conectada!")
+    else:
+        SPOTIFY_ENABLED = False
+        print("⚠️  Spotify não configurado. Configure SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET")
+except Exception as e:
+    SPOTIFY_ENABLED = False
+    print(f"⚠️  Erro ao conectar Spotify: {e}")
 
 
 def allowed_file(filename):
@@ -36,110 +69,115 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def detect_note_duration(y, sr, onset_time, max_duration=2.0):
+def search_youtube_and_download(query):
     """
-    Detecta a duração de uma nota baseado na energia do sinal
+    Busca e baixa áudio do YouTube
     
     Args:
-        y: sinal de áudio
-        sr: sample rate
-        onset_time: tempo de início da nota
-        max_duration: duração máxima a verificar
+        query: string de busca (ex: "Queen - Bohemian Rhapsody")
     
     Returns:
-        duração da nota em segundos
+        caminho do arquivo baixado ou None se falhar
     """
-    # Converte tempo para frame
+    try:
+        print(f"🔍 Buscando no YouTube: {query}")
+
+        
+        
+
+        
+        # Configurações do yt-dlp
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': os.path.join(UPLOAD_FOLDER, '%(title)s.%(ext)s'),
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'default_search': 'ytsearch1',  # Pega o primeiro resultado
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Busca e extrai info
+            info = ydl.extract_info(f"ytsearch1:{query}", download=True)
+            
+            if 'entries' in info:
+                info = info['entries'][0]
+            
+            # Caminho do arquivo baixado
+            title = info['title']
+            # Remove caracteres inválidos do nome do arquivo
+            safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
+            filepath = os.path.join(UPLOAD_FOLDER, f"{safe_title}.mp3")
+            
+            print(f"✅ Download completo: {title}")
+            return filepath
+            
+    except Exception as e:
+        print(f"❌ Erro ao baixar do YouTube: {str(e)}")
+        return None
+
+
+def detect_note_duration(y, sr, onset_time, max_duration=2.0):
+    """Detecta a duração de uma nota baseado na energia do sinal"""
     onset_frame = librosa.time_to_frames(onset_time, sr=sr)
-    max_frames = int(max_duration * sr / 512)  # hop_length padrão = 512
+    max_frames = int(max_duration * sr / 512)
     
-    # Calcula RMS (energia) do sinal
     rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
     
-    # Pega a energia a partir do onset
     start_idx = onset_frame
     end_idx = min(start_idx + max_frames, len(rms))
     
     if start_idx >= len(rms):
-        return 0.1  # Nota muito curta
+        return 0.1
     
-    # Energia inicial da nota
     initial_energy = rms[start_idx]
-    threshold = initial_energy * 0.3  # 30% da energia inicial
+    threshold = initial_energy * 0.3
     
-    # Procura onde a energia cai abaixo do threshold
     duration_frames = 1
     for i in range(start_idx + 1, end_idx):
         if rms[i] < threshold:
             break
         duration_frames += 1
     
-    # Converte frames para tempo
     duration = librosa.frames_to_time(duration_frames, sr=sr)
-    
-    # Limita entre 0.1 e max_duration
     return float(max(0.1, min(duration, max_duration)))
 
 
 def analyze_audio(file_path, difficulty='medium'):
-    """
-    Analisa o arquivo de áudio e extrai informações para o jogo
-    AGORA COM NOTAS LONGAS!
-    
-    Args:
-        file_path: caminho do arquivo de áudio
-        difficulty: nível de dificuldade ('easy', 'medium', 'hard', 'expert')
-    
-    Returns:
-        dict com informações do áudio e notas geradas
-    """
+    """Analisa o arquivo de áudio e extrai informações para o jogo"""
     try:
-        # Carrega o áudio
         print(f"Carregando áudio: {file_path}")
         y, sr = librosa.load(file_path, sr=22050)
         duration = float(librosa.get_duration(y=y, sr=sr))
         
         print(f"Duração: {duration:.2f}s, Sample rate: {sr}")
         
-        # Detecta tempo e beats
         tempo_result, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
         tempo = float(tempo_result.item()) if hasattr(tempo_result, 'item') else float(tempo_result)
         beat_times = librosa.frames_to_time(beat_frames, sr=sr)
         
         print(f"BPM detectado: {tempo:.2f}, Beats encontrados: {len(beat_times)}")
         
-        # Detecta onset (início de notas/eventos musicais)
-        onset_frames = librosa.onset.onset_detect(
-            y=y, 
-            sr=sr, 
-            backtrack=True,
-            units='frames'
-        )
+        onset_frames = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True, units='frames')
         onset_times = librosa.frames_to_time(onset_frames, sr=sr)
         
         print(f"Onsets detectados: {len(onset_times)}")
         
-        # Extrai características espectrais
         spectral_centroids = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
-        
-        # Calcula chromagram para detectar notas musicais
         chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
         
         print(f"Analisando durações de notas...")
         
-        # Gera notas COM DURAÇÃO baseadas na dificuldade
         notes = generate_notes_with_duration(
-            y,
-            sr,
-            beat_times, 
-            onset_times, 
-            spectral_centroids,
-            chroma,
-            difficulty,
-            duration
+            y, sr, beat_times, onset_times, 
+            spectral_centroids, chroma, difficulty, duration
         )
         
-        # Informações do áudio
         audio_info = {
             'duration': duration,
             'tempo': tempo,
@@ -168,113 +206,110 @@ def analyze_audio(file_path, difficulty='medium'):
 
 
 def generate_notes_with_duration(y, sr, beat_times, onset_times, spectral_centroids, chroma, difficulty, total_duration):
-    """
-    Gera as notas do jogo COM DURAÇÃO (hold notes)
-    
-    Args:
-        y: sinal de áudio
-        sr: sample rate
-        beat_times: timestamps dos beats
-        onset_times: timestamps dos onsets
-        spectral_centroids: características espectrais
-        chroma: informação de pitch
-        difficulty: nível de dificuldade
-        total_duration: duração total da música
-    
-    Returns:
-        lista de notas para o jogo (com type: 'tap' ou 'hold')
-    """
+    """Gera notas do jogo COM DURAÇÃO"""
     notes = []
     note_id = 0
     
-    # Configurações por dificuldade
     difficulty_config = {
         'easy': {
             'use_beats': True,
             'use_onsets': False,
-            'density': 0.4,
+            'density': 0.7,
             'lanes': 3,
-            'hold_probability': 0.15,  # 15% de chance de nota longa
-            'min_hold_duration': 0.3
+            'hold_probability': 0.12,
+            'min_hold_duration': 0.5,
+            'min_time_gap': 0.4
         },
         'medium': {
             'use_beats': True,
             'use_onsets': True,
-            'density': 0.65,
+            'density': 0.6,
             'lanes': 4,
             'hold_probability': 0.25,
-            'min_hold_duration': 0.3
+            'min_hold_duration': 0.35,
+            'min_time_gap': 0.25
         },
         'hard': {
             'use_beats': True,
             'use_onsets': True,
-            'density': 0.8,
+            'density': 0.75,
             'lanes': 5,
-            'hold_probability': 0.35,
-            'min_hold_duration': 0.25
+            'hold_probability': 0.3,
+            'min_hold_duration': 0.3,
+            'min_time_gap': 0.2
         },
         'expert': {
             'use_beats': True,
             'use_onsets': True,
-            'density': 1.0,
+            'density': 0.9,
             'lanes': 5,
-            'hold_probability': 0.45,
-            'min_hold_duration': 0.2
+            'hold_probability': 0.35,
+            'min_hold_duration': 0.25,
+            'min_time_gap': 0.15
         }
     }
     
     config = difficulty_config.get(difficulty, difficulty_config['medium'])
     num_lanes = config['lanes']
+    min_time_gap = config['min_time_gap']
     
-    # Combina beats e onsets
     all_times = []
-    
     if config['use_beats']:
         all_times.extend(beat_times)
-    
     if config['use_onsets']:
         all_times.extend(onset_times)
     
-    # Remove duplicatas e ordena
     all_times = sorted(list(set([round(float(t), 3) for t in all_times])))
     
-    # Aplica densidade
+    filtered_times = []
+    last_time = -999
+    for time in all_times:
+        if time - last_time >= min_time_gap:
+            filtered_times.append(time)
+            last_time = time
+    
     step = max(1, int(1 / config['density']))
-    selected_times = all_times[::step]
+    selected_times = filtered_times[::step]
     
-    print(f"Gerando notas - Tempos totais: {len(all_times)}, Selecionados: {len(selected_times)}")
+    print(f"Gerando notas - Tempos totais: {len(all_times)}, Filtrados: {len(filtered_times)}, Selecionados: {len(selected_times)}")
     
-    # Calcula RMS para detecção de duração
-    rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
+    lane_counts = [0] * num_lanes
     
-    # Gera notas
     for i, time in enumerate(selected_times):
-        if time < 1.0:  # Pula primeiro segundo
+        if time < 1.0:
             continue
-            
-        if time > total_duration - 2.0:  # Pula últimos 2 segundos
+        if time > total_duration - 2.0:
             break
         
-        # Determina a lane baseado no centroid espectral
+        chroma_index = int((time / total_duration) * chroma.shape[1])
+        chroma_index = min(chroma_index, chroma.shape[1] - 1)
+        
+        chroma_frame = chroma[:, chroma_index]
+        top_pitches = np.argsort(chroma_frame)[-3:]
+        
+        dominant_pitch = top_pitches[-1]
+        lane = dominant_pitch % num_lanes
+        
+        if lane_counts[lane] > np.mean(lane_counts) + 2:
+            lane = int(np.argmin(lane_counts))
+        
         spectral_index = int((time / total_duration) * len(spectral_centroids))
         spectral_index = min(spectral_index, len(spectral_centroids) - 1)
-        
-        # Normaliza centroid para lane (0 a num_lanes-1)
         normalized_centroid = spectral_centroids[spectral_index] / np.max(spectral_centroids)
-        lane = int(normalized_centroid * (num_lanes - 1))
-        lane = max(0, min(lane, num_lanes - 1))
         
-        # Decide se é nota longa ou curta
+        if np.random.random() < 0.3:
+            lane = int(normalized_centroid * (num_lanes - 1))
+        
+        lane = max(0, min(lane, num_lanes - 1))
+        lane_counts[lane] += 1
+        
         is_hold_note = np.random.random() < config['hold_probability']
         
         note_duration = 0.0
         note_type = 'tap'
         
         if is_hold_note:
-            # Detecta duração da nota
             note_duration = detect_note_duration(y, sr, time, max_duration=2.5)
-            
-            # Só considera hold note se duração for significativa
             if note_duration >= config['min_hold_duration']:
                 note_type = 'hold'
             else:
@@ -294,32 +329,145 @@ def generate_notes_with_duration(y, sr, beat_times, onset_times, spectral_centro
     
     hold_count = sum(1 for n in notes if n['type'] == 'hold')
     print(f"Notas geradas: {len(notes)} total ({hold_count} hold notes)")
+    print(f"Distribuição por lane: {lane_counts}")
     
     return notes
 
 
+# ============================================================
+# NOVOS ENDPOINTS v3 - SPOTIFY + YOUTUBE
+# ============================================================
+
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Endpoint para verificar se a API está funcionando"""
+    """Verifica status da API"""
     return jsonify({
         'status': 'online',
-        'message': 'Guitar Hero Backend v2 - With Hold Notes!',
-        'version': '2.0'
+        'message': 'Guitar Hero Backend v3 - Spotify + YouTube!',
+        'version': '3.0',
+        'spotify_enabled': SPOTIFY_ENABLED
     })
+
+
+@app.route('/search/spotify', methods=['GET'])
+def search_spotify():
+    """
+    Busca músicas no Spotify
+    
+    Query params:
+        q: termo de busca
+        limit: número de resultados (padrão: 10)
+    
+    Returns:
+        JSON com lista de músicas do Spotify
+    """
+    if not SPOTIFY_ENABLED:
+        return jsonify({
+            'success': False,
+            'error': 'Spotify não configurado. Configure as credenciais no backend.'
+        }), 503
+    
+    query = request.args.get('q', '')
+    limit = int(request.args.get('limit', 10))
+    
+    if not query:
+        return jsonify({
+            'success': False,
+            'error': 'Parâmetro "q" é obrigatório'
+        }), 400
+    
+    try:
+        print(f"🔍 Buscando no Spotify: {query}")
+        results = sp.search(q=query, limit=limit, type='track')
+        
+        tracks = []
+        for item in results['tracks']['items']:
+            track = {
+                'id': item['id'],
+                'name': item['name'],
+                'artist': ', '.join([artist['name'] for artist in item['artists']]),
+                'album': item['album']['name'],
+                'image': item['album']['images'][0]['url'] if item['album']['images'] else None,
+                'preview_url': item['preview_url'],  # 30 segundos de preview
+                'duration_ms': item['duration_ms'],
+                'spotify_url': item['external_urls']['spotify']
+            }
+            tracks.append(track)
+        
+        print(f"✅ Encontradas {len(tracks)} músicas")
+        
+        return jsonify({
+            'success': True,
+            'tracks': tracks
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar no Spotify: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/analyze/youtube', methods=['POST'])
+def analyze_from_youtube():
+    """
+    Baixa música do YouTube e analisa
+    
+    Body JSON:
+        query: string de busca (ex: "Queen - Bohemian Rhapsody")
+        difficulty: easy/medium/hard/expert
+    
+    Returns:
+        JSON com notas geradas
+    """
+    data = request.get_json()
+    
+    if not data or 'query' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'Campo "query" é obrigatório'
+        }), 400
+    
+    query = data['query']
+    difficulty = data.get('difficulty', 'medium')
+    
+    try:
+        # Baixa do YouTube
+        filepath = search_youtube_and_download(query)
+        
+        if not filepath or not os.path.exists(filepath):
+            return jsonify({
+                'success': False,
+                'error': 'Falha ao baixar áudio do YouTube'
+            }), 500
+        
+        # Analisa o áudio
+        result = analyze_audio(filepath, difficulty)
+        
+        # Remove arquivo temporário
+        try:
+            os.remove(filepath)
+            print(f"Arquivo temporário removido: {filepath}")
+        except:
+            pass
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        print(f"❌ Erro: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    """
-    Endpoint principal para upload e análise de áudio
-    
-    Parâmetros:
-        file: arquivo de áudio (multipart/form-data)
-        difficulty: 'easy', 'medium', 'hard', 'expert' (opcional, padrão: medium)
-    
-    Retorna:
-        JSON com informações do áudio e notas geradas (incluindo hold notes)
-    """
+    """Endpoint original - upload de arquivo"""
     if 'file' not in request.files:
         return jsonify({
             'success': False,
@@ -351,10 +499,8 @@ def analyze():
         
         print(f"Arquivo salvo em: {filepath}")
         
-        # Analisa o áudio
         result = analyze_audio(filepath, difficulty)
         
-        # Remove arquivo temporário
         try:
             os.remove(filepath)
             print(f"Arquivo temporário removido: {filepath}")
@@ -367,74 +513,24 @@ def analyze():
             return jsonify(result), 500
             
     except Exception as e:
-        print(f"Erro no endpoint /analyze: {str(e)}")
+        print(f"❌ Erro: {str(e)}")
         return jsonify({
             'success': False,
-            'error': f'Erro ao processar arquivo: {str(e)}'
+            'error': str(e)
         }), 500
-
-
-@app.route('/test-generation', methods=['GET'])
-def test_generation():
-    """
-    Endpoint de teste que gera notas sintéticas COM HOLD NOTES
-    """
-    duration = float(request.args.get('duration', 180))
-    difficulty = request.args.get('difficulty', 'medium')
-    
-    bpm = 120
-    beat_interval = 60 / bpm
-    beat_times = np.arange(0, duration, beat_interval)
-    onset_times = np.arange(0, duration, beat_interval / 2)
-    
-    spectral_centroids = np.random.rand(int(duration * 100)) * 5000
-    
-    # Gera sinal sintético para teste
-    sr = 22050
-    y = np.random.randn(int(duration * sr)) * 0.1
-    
-    chroma = np.random.rand(12, int(duration * 100))
-    
-    notes = generate_notes_with_duration(
-        y, sr, beat_times, onset_times, 
-        spectral_centroids, chroma, difficulty, duration
-    )
-    
-    hold_count = sum(1 for n in notes if n['type'] == 'hold')
-    
-    return jsonify({
-        'success': True,
-        'audio_info': {
-            'duration': duration,
-            'tempo': bpm,
-            'beats_count': len(beat_times),
-            'onsets_count': len(onset_times),
-            'notes_count': len(notes),
-            'hold_notes_count': hold_count,
-            'difficulty': difficulty,
-            'sample_rate': sr
-        },
-        'notes': notes
-    })
 
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🎸 Guitar Hero Backend v2 - WITH HOLD NOTES!")
+    print("🎸 Guitar Hero Backend v3 - Spotify + YouTube!")
     print("=" * 60)
     print(f"Upload folder: {UPLOAD_FOLDER}")
-    print(f"Extensões permitidas: {', '.join(ALLOWED_EXTENSIONS)}")
-    print(f"Tamanho máximo: {MAX_FILE_SIZE / (1024*1024)}MB")
+    print(f"Spotify Status: {'✅ Conectado' if SPOTIFY_ENABLED else '⚠️  Não configurado'}")
     print("=" * 60)
-    print("\nNovidades v2:")
-    print("  ✨ Notas longas (hold notes)")
-    print("  ✨ Detecção de duração automática")
-    print("  ✨ Tipos: 'tap' e 'hold'")
-    print("=" * 60)
-    print("\nEndpoints disponíveis:")
-    print("  GET  /health - Verifica status da API")
-    print("  POST /analyze - Analisa arquivo de áudio")
-    print("  GET  /test-generation - Gera notas de teste")
+    print("\nNovos endpoints v3:")
+    print("  GET  /search/spotify?q=QUERY - Busca no Spotify")
+    print("  POST /analyze/youtube - Baixa do YouTube e analisa")
+    print("  POST /analyze - Upload de arquivo (método antigo)")
     print("\nIniciando servidor...")
     print("=" * 60)
     
