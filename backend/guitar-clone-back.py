@@ -2,6 +2,7 @@
 Guitar Hero Backend - v3
 Sistema com Spotify + YouTube
 Busca músicas no Spotify e baixa áudio do YouTube
+AGORA COM STREAMING DE ÁUDIO!
 
 Requisitos:
 pip install flask flask-cors librosa numpy soundfile spotipy yt-dlp
@@ -16,7 +17,7 @@ Uso:
 python guitar_hero_backend_v3.py
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import librosa
 import numpy as np
@@ -28,6 +29,8 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import yt_dlp
 import re
+import hashlib
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -40,11 +43,18 @@ SPOTIFY_CLIENT_SECRET = '5c7e7aa7d32041e397f6a1fb15f669ed'
 
 # Configurações gerais
 UPLOAD_FOLDER = tempfile.gettempdir()
+AUDIO_CACHE_FOLDER = os.path.join(tempfile.gettempdir(), 'guitar_hero_cache')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'flac', 'm4a'}
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
+# Cria pasta de cache se não existir
+os.makedirs(AUDIO_CACHE_FOLDER, exist_ok=True)
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+# Cache de áudios baixados (query -> filepath)
+audio_cache = {}
 
 # Inicializa Spotify Client
 try:
@@ -69,22 +79,28 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def search_youtube_and_download(query):
+def search_youtube_and_download(query, use_cache=True):
     """
-    Busca e baixa áudio do YouTube
+    Busca e baixa áudio do YouTube com sistema de cache
     
     Args:
         query: string de busca (ex: "Queen - Bohemian Rhapsody")
+        use_cache: usar cache de downloads anteriores
     
     Returns:
-        caminho do arquivo baixado ou None se falhar
+        (filepath, cache_id) ou (None, None) se falhar
     """
+    # Gera ID único para o cache baseado na query
+    cache_id = hashlib.md5(query.encode()).hexdigest()
+    cached_path = os.path.join(AUDIO_CACHE_FOLDER, f"{cache_id}.mp3")
+    
+    # Verifica se já está em cache
+    if use_cache and os.path.exists(cached_path):
+        print(f"♻️  Usando áudio do cache: {query}")
+        return cached_path, cache_id
+    
     try:
         print(f"🔍 Buscando no YouTube: {query}")
-
-        
-        
-
         
         # Configurações do yt-dlp
         ydl_opts = {
@@ -94,32 +110,59 @@ def search_youtube_and_download(query):
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
-            'outtmpl': os.path.join(UPLOAD_FOLDER, '%(title)s.%(ext)s'),
-            'quiet': True,
-            'no_warnings': True,
+            'outtmpl': cached_path.replace('.mp3', '.%(ext)s'),
+            'quiet': False,
+            'no_warnings': False,
             'extract_flat': False,
-            'default_search': 'ytsearch1',  # Pega o primeiro resultado
+            'default_search': 'ytsearch1',
+            'age_limit': None,
+            'nocheckcertificate': True,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Busca e extrai info
+            print(f"📥 Tentando extrair informações...")
             info = ydl.extract_info(f"ytsearch1:{query}", download=True)
             
             if 'entries' in info:
                 info = info['entries'][0]
             
-            # Caminho do arquivo baixado
-            title = info['title']
-            # Remove caracteres inválidos do nome do arquivo
-            safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
-            filepath = os.path.join(UPLOAD_FOLDER, f"{safe_title}.mp3")
+            print(f"📹 Vídeo encontrado:")
+            print(f"   - Título: {info.get('title', 'N/A')}")
+            print(f"   - Canal: {info.get('uploader', 'N/A')}")
+            print(f"   - Duração: {info.get('duration', 0)}s")
             
-            print(f"✅ Download completo: {title}")
-            return filepath
+            # Verifica se o arquivo foi criado
+            if os.path.exists(cached_path):
+                file_size = os.path.getsize(cached_path) / (1024 * 1024)
+                print(f"✅ Download completo: {info['title']}")
+                print(f"   - Cache ID: {cache_id}")
+                print(f"   - Tamanho: {file_size:.2f}MB")
+                
+                # Adiciona ao cache em memória
+                audio_cache[cache_id] = {
+                    'query': query,
+                    'filepath': cached_path,
+                    'title': info['title'],
+                    'timestamp': time.time()
+                }
+                
+                return cached_path, cache_id
+            else:
+                print(f"❌ Arquivo não foi criado")
+                return None, None
             
+    except yt_dlp.utils.DownloadError as e:
+        print(f"❌ Erro de download do YouTube: {str(e)}")
+        if 'age' in str(e).lower():
+            print(f"   💡 Possível vídeo com restrição de idade")
+        if 'copyright' in str(e).lower():
+            print(f"   💡 Possível bloqueio por copyright")
+        return None, None
     except Exception as e:
-        print(f"❌ Erro ao baixar do YouTube: {str(e)}")
-        return None
+        print(f"❌ Erro inesperado: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None, None
 
 
 def detect_note_duration(y, sr, onset_time, max_duration=2.0):
@@ -413,13 +456,14 @@ def search_spotify():
 def analyze_from_youtube():
     """
     Baixa música do YouTube e analisa
+    AGORA RETORNA O CACHE_ID PARA STREAMING
     
     Body JSON:
         query: string de busca (ex: "Queen - Bohemian Rhapsody")
         difficulty: easy/medium/hard/expert
     
     Returns:
-        JSON com notas geradas
+        JSON com notas geradas + cache_id para streaming
     """
     data = request.get_json()
     
@@ -433,32 +477,75 @@ def analyze_from_youtube():
     difficulty = data.get('difficulty', 'medium')
     
     try:
-        # Baixa do YouTube
-        filepath = search_youtube_and_download(query)
+        # Baixa do YouTube (com cache)
+        filepath, cache_id = search_youtube_and_download(query, use_cache=True)
         
         if not filepath or not os.path.exists(filepath):
             return jsonify({
                 'success': False,
-                'error': 'Falha ao baixar áudio do YouTube'
+                'error': 'Falha ao baixar áudio do YouTube. Vídeo pode ter restrições.'
             }), 500
         
         # Analisa o áudio
         result = analyze_audio(filepath, difficulty)
         
-        # Remove arquivo temporário
-        try:
-            os.remove(filepath)
-            print(f"Arquivo temporário removido: {filepath}")
-        except:
-            pass
+        # NÃO remove o arquivo - mantém em cache!
         
         if result['success']:
+            # Adiciona cache_id e URL de streaming à resposta
+            result['cache_id'] = cache_id
+            result['audio_url'] = f'/stream/{cache_id}'
+            print(f"✅ Análise completa! Stream URL: /stream/{cache_id}")
             return jsonify(result), 200
         else:
             return jsonify(result), 500
             
     except Exception as e:
         print(f"❌ Erro: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/stream/<cache_id>', methods=['GET'])
+def stream_audio(cache_id):
+    """
+    Serve o arquivo de áudio para streaming
+    
+    Path param:
+        cache_id: ID do áudio no cache
+    
+    Returns:
+        Arquivo MP3 para streaming
+    """
+    try:
+        # Verifica se o cache_id existe
+        if cache_id in audio_cache:
+            filepath = audio_cache[cache_id]['filepath']
+        else:
+            # Tenta encontrar o arquivo diretamente
+            filepath = os.path.join(AUDIO_CACHE_FOLDER, f"{cache_id}.mp3")
+        
+        if not os.path.exists(filepath):
+            print(f"❌ Arquivo não encontrado: {cache_id}")
+            return jsonify({
+                'success': False,
+                'error': 'Áudio não encontrado. Cache expirado?'
+            }), 404
+        
+        print(f"🎵 Servindo áudio: {cache_id}")
+        
+        # Serve o arquivo com suporte a range requests (para seek)
+        return send_file(
+            filepath,
+            mimetype='audio/mpeg',
+            as_attachment=False,
+            download_name='audio.mp3'
+        )
+        
+    except Exception as e:
+        print(f"❌ Erro ao servir áudio: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

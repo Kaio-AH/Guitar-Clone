@@ -86,6 +86,8 @@ const GuitarHeroGame = () => {
 
     try {
       const query = `${track.artist} - ${track.name}`;
+      console.log('📥 Enviando para backend:', query);
+      
       const response = await fetch(`${BACKEND_URL}/analyze/youtube`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,6 +96,9 @@ const GuitarHeroGame = () => {
 
       const data = await response.json();
       if (data.success) {
+        console.log('✅ Análise completa!');
+        console.log('🎵 Stream URL:', data.audio_url);
+        
         const preparedNotes = data.notes.map(note => ({
           ...note,
           y: SPAWN_HEIGHT,
@@ -107,13 +112,25 @@ const GuitarHeroGame = () => {
         notesRef.current = preparedNotes;
         setAudioInfo(data.audio_info);
         setAudioFileName(`${track.artist} - ${track.name}`);
-        setAudioFile('youtube');
+        
+        // USA A URL DE STREAMING DO BACKEND
+        const streamUrl = `${BACKEND_URL}${data.audio_url}`;
+        console.log('🎧 Configurando stream:', streamUrl);
+        
+        setAudioFile(streamUrl);
+        if (audioRef.current) {
+          audioRef.current.src = streamUrl;
+          audioRef.current.load();
+          console.log('✅ Áudio configurado!');
+        }
+        
         setViewMode('game');
         setIsAnalyzing(false);
       } else {
         throw new Error(data.error);
       }
     } catch (error) {
+      console.error('❌ Erro:', error);
       setAnalysisError(`Erro: ${error.message}`);
       setIsAnalyzing(false);
     }
@@ -307,12 +324,38 @@ const GuitarHeroGame = () => {
   };
 
   const togglePlay = () => {
-    if (!audioRef.current || notes.length === 0) return;
+    console.log('togglePlay chamado');
+    console.log('audioRef.current:', audioRef.current);
+    console.log('audioRef.current.src:', audioRef.current?.src);
+    console.log('notes.length:', notes.length);
+    
+    if (!audioRef.current || notes.length === 0) {
+      console.log('❌ Sem áudio ou notas');
+      return;
+    }
+    
+    // Verifica se há src configurado
+    if (!audioRef.current.src || audioRef.current.src === window.location.href) {
+      console.log('❌ Áudio não carregado. Src:', audioRef.current.src);
+      setAnalysisError('Áudio não disponível. Esta música só tem preview de 30s do Spotify.');
+      return;
+    }
+    
     if (isPlaying) {
+      console.log('⏸️ Pausando');
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().then(() => setIsPlaying(true));
+      console.log('▶️ Tentando tocar');
+      audioRef.current.play()
+        .then(() => {
+          console.log('✅ Tocando!');
+          setIsPlaying(true);
+        })
+        .catch(err => {
+          console.error('❌ Erro ao tocar:', err);
+          setAnalysisError('Erro ao reproduzir áudio: ' + err.message);
+        });
     }
   };
 
