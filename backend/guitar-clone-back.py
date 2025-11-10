@@ -38,8 +38,8 @@ CORS(app)
 # ============================================================
 # CONFIGURAÇÃO DO SPOTIFY - ADICIONE SUAS CREDENCIAIS AQUI!
 # ============================================================
-SPOTIFY_CLIENT_ID = '93c97ca549a14093875c81df94b05455'
-SPOTIFY_CLIENT_SECRET = '5c7e7aa7d32041e397f6a1fb15f669ed'
+SPOTIFY_CLIENT_ID = 'sua_chave_api'
+SPOTIFY_CLIENT_SECRET = 'seu_client_secret_id'
 
 # Configurações gerais
 UPLOAD_FOLDER = tempfile.gettempdir()
