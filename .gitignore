@@ -12,6 +12,11 @@ backend/.cache
 pygame-client/cache/
 guitar_hero_cache/
 
+# Credenciais locais (use backend/.env.example como modelo)
+.env
+.env.*
+!.env.example
+
 # Logs / artefatos temporarios
 *.log
 crash.log

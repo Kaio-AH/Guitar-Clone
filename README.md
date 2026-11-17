@@ -64,7 +64,31 @@ Vite em `http://localhost:5173` e o cliente PyGame consome a API na porta 5000.
 Crie um app em <https://developer.spotify.com/dashboard> e use as credenciais
 via variáveis de ambiente. **Nunca comite `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`.**
 
-### PowerShell
+### Arquivo `backend/.env` (recomendado)
+
+Copie o modelo e preencha:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+notepad backend\.env
+```
+
+```bash
+cp backend/.env.example backend/.env
+nano backend/.env
+```
+
+Formato do arquivo (uma variável por linha, **sem** `set` na frente):
+
+```dotenv
+SPOTIFY_CLIENT_ID=seu_client_id
+SPOTIFY_CLIENT_SECRET=seu_client_secret
+```
+
+O backend carrega `backend/.env` automaticamente (via `python-dotenv`) e não
+sobrescreve variáveis já definidas no ambiente. O `.env` está no `.gitignore`.
+
+### Variáveis de ambiente (alternativa)
 
 ```powershell
 $env:SPOTIFY_CLIENT_ID = "seu_client_id"
@@ -78,7 +102,7 @@ Para deixar permanente no usuário:
 [Environment]::SetEnvironmentVariable("SPOTIFY_CLIENT_SECRET", "seu_client_secret", "User")
 ```
 
-### WSL / Linux
+### WSL / Linux (variáveis de ambiente)
 
 ```bash
 export SPOTIFY_CLIENT_ID="seu_client_id"
@@ -300,6 +324,8 @@ em cache (`pygame-client/cache/` e a pasta temporária do sistema,
 | `YT_COOKIES_BROWSER` | — | Navegador de onde ler cookies (`chrome`, `firefox`, `edge`, `brave`) |
 | `GUITAR_BACKEND_URL` | `http://127.0.0.1:5000` | URL do backend usada pelo cliente PyGame |
 | `PYTHONIOENCODING` | — | Use `utf-8` no Windows para o backend |
+
+Essas variáveis podem vir do ambiente ou de `backend/.env` (veja a seção 1).
 
 Exemplo com cookies do YouTube (quando aparece `HTTP 403: Forbidden`):
 

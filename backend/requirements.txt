@@ -7,3 +7,4 @@ soundfile
 setuptools
 spotipy 
 yt-dlp>=2026.1.1
+python-dotenv

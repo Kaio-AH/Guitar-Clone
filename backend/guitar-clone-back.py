@@ -33,13 +33,49 @@ import re
 import hashlib
 import time
 
+
+def _load_env_file() -> None:
+    """Carrega backend/.env (ou .env na raiz) sem sobrescrever o ambiente."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    candidates = (os.path.join(base, '.env'), os.path.join(os.path.dirname(base), '.env'))
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            from dotenv import load_dotenv
+        except ImportError:
+            load_dotenv = None
+        if load_dotenv is not None:
+            load_dotenv(path, override=False)
+        else:
+            # Fallback simples caso python-dotenv nao esteja instalado.
+            try:
+                with open(path, 'r', encoding='utf-8-sig') as handle:
+                    for raw in handle:
+                        line = raw.strip()
+                        if line.lower().startswith('set '):
+                            line = line[4:].strip()
+                        if not line or line.startswith('#') or '=' not in line:
+                            continue
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key and key not in os.environ:
+                            os.environ[key] = value
+            except OSError:
+                pass
+        break
+
+
+_load_env_file()
+
 app = Flask(__name__)
 CORS(app)
 
 # ============================================================
-# CONFIGURAÇÃO DO SPOTIFY - use variáveis de ambiente
-#   set SPOTIFY_CLIENT_ID=...
-#   set SPOTIFY_CLIENT_SECRET=...
+# CONFIGURACAO DO SPOTIFY - use variaveis de ambiente ou backend/.env
+#   SPOTIFY_CLIENT_ID=...
+#   SPOTIFY_CLIENT_SECRET=...
 # ============================================================
 SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID', 'sua_chave_api')
 SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', 'seu_client_secret_id')
