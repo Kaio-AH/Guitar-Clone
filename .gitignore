@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Caches locais (tokens do Spotify, audios baixados)
+.cache
+backend/.cache
+pygame-client/cache/
+guitar_hero_cache/
+
+# Logs / artefatos temporarios
+*.log
+crash.log
+*.tmp
+
+# Node / frontend
+node_modules/
+frontend/dist/
+dist/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Music, Upload, Play, Pause, RotateCcw, Zap, AlertCircle, Loader, Flame, Search, Download } from 'lucide-react';
+import { Music, Upload, Play, Pause, RotateCcw, Zap, AlertCircle, Loader, Flame, Search, Download, Smartphone } from 'lucide-react';
 
 const GuitarHeroGame = () => {
   const [audioFile, setAudioFile] = useState(null);
@@ -18,8 +18,8 @@ const GuitarHeroGame = () => {
   const [notesHit, setNotesHit] = useState(0);
   const [notesMissed, setNotesMissed] = useState(0);
   const [multiplier, setMultiplier] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
   
-  // Estados v3 - Spotify
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -36,10 +36,19 @@ const GuitarHeroGame = () => {
   const LANES = ['A', 'S', 'D', 'J', 'K'];
   const COLORS = ['#22c55e', '#ef4444', '#eab308', '#3b82f6', '#f97316'];
   const NOTE_SPEED = 350;
-  const HIT_ZONE = 60;
+  const HIT_ZONE = 70;
   const SPAWN_HEIGHT = -100;
   const TARGET_Y = 520;
   const BACKEND_URL = 'http://localhost:5000';
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleSpotifySearch = async () => {
     if (!searchQuery.trim()) return;
@@ -86,8 +95,6 @@ const GuitarHeroGame = () => {
 
     try {
       const query = `${track.artist} - ${track.name}`;
-      console.log('📥 Enviando para backend:', query);
-      
       const response = await fetch(`${BACKEND_URL}/analyze/youtube`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,9 +103,6 @@ const GuitarHeroGame = () => {
 
       const data = await response.json();
       if (data.success) {
-        console.log('✅ Análise completa!');
-        console.log('🎵 Stream URL:', data.audio_url);
-        
         const preparedNotes = data.notes.map(note => ({
           ...note,
           y: SPAWN_HEIGHT,
@@ -113,15 +117,11 @@ const GuitarHeroGame = () => {
         setAudioInfo(data.audio_info);
         setAudioFileName(`${track.artist} - ${track.name}`);
         
-        // USA A URL DE STREAMING DO BACKEND
         const streamUrl = `${BACKEND_URL}${data.audio_url}`;
-        console.log('🎧 Configurando stream:', streamUrl);
-        
         setAudioFile(streamUrl);
         if (audioRef.current) {
           audioRef.current.src = streamUrl;
           audioRef.current.load();
-          console.log('✅ Áudio configurado!');
         }
         
         setViewMode('game');
@@ -130,7 +130,6 @@ const GuitarHeroGame = () => {
         throw new Error(data.error);
       }
     } catch (error) {
-      console.error('❌ Erro:', error);
       setAnalysisError(`Erro: ${error.message}`);
       setIsAnalyzing(false);
     }
@@ -274,6 +273,21 @@ const GuitarHeroGame = () => {
     };
   }, [pressedKeys, isPlaying, viewMode]);
 
+  const handleMobileTouch = (laneIndex, action) => {
+    const key = LANES[laneIndex];
+    if (action === 'down') {
+      setPressedKeys(p => new Set([...p, key]));
+      if (isPlaying) checkHit(key, 'down');
+    } else {
+      setPressedKeys(p => {
+        const n = new Set(p);
+        n.delete(key);
+        return n;
+      });
+      if (isPlaying) checkHit(key, 'up');
+    }
+  };
+
   const checkHit = (key, action) => {
     const laneIndex = LANES.indexOf(key);
     if (laneIndex === -1) return;
@@ -324,38 +338,14 @@ const GuitarHeroGame = () => {
   };
 
   const togglePlay = () => {
-    console.log('togglePlay chamado');
-    console.log('audioRef.current:', audioRef.current);
-    console.log('audioRef.current.src:', audioRef.current?.src);
-    console.log('notes.length:', notes.length);
-    
-    if (!audioRef.current || notes.length === 0) {
-      console.log('❌ Sem áudio ou notas');
-      return;
-    }
-    
-    // Verifica se há src configurado
-    if (!audioRef.current.src || audioRef.current.src === window.location.href) {
-      console.log('❌ Áudio não carregado. Src:', audioRef.current.src);
-      setAnalysisError('Áudio não disponível. Esta música só tem preview de 30s do Spotify.');
-      return;
-    }
-    
+    if (!audioRef.current || notes.length === 0) return;
     if (isPlaying) {
-      console.log('⏸️ Pausando');
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      console.log('▶️ Tentando tocar');
-      audioRef.current.play()
-        .then(() => {
-          console.log('✅ Tocando!');
-          setIsPlaying(true);
-        })
-        .catch(err => {
-          console.error('❌ Erro ao tocar:', err);
-          setAnalysisError('Erro ao reproduzir áudio: ' + err.message);
-        });
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(e => {
+        setAnalysisError('Erro ao tocar');
+      });
     }
   };
 
@@ -394,79 +384,47 @@ const GuitarHeroGame = () => {
   const displayColors = COLORS.slice(0, activeLanes);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white">
-      <div className="p-6 bg-black bg-opacity-70 border-b border-purple-500">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <Music className="w-8 h-8 text-purple-400" />
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Guitar Hero v3
-              </h1>
-              <p className="text-xs text-gray-400">🎵 Spotify + YouTube</p>
-            </div>
-          </div>
-          {viewMode === 'game' && (
-            <div className="flex gap-6">
-              <div className="text-right">
-                <div className="text-xs text-gray-400">Score</div>
-                <div className="text-2xl font-bold text-yellow-400">{score.toLocaleString()}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-400">Combo</div>
-                <div className="text-2xl font-bold text-pink-400">{combo}x {multiplier > 1 && `(${multiplier}x)`}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-black text-white overflow-hidden">
       {viewMode === 'search' && (
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold mb-2">Buscar Música</h2>
-            <p className="text-gray-400">Spotify + YouTube</p>
+        <div className="max-w-4xl mx-auto p-4 md:p-6">
+          <div className="text-center mb-6 md:mb-8">
+            <h1 className="text-3xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-green-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Guitar Hero v3
+            </h1>
+            <p className="text-gray-400 text-sm md:text-base">🎵 Spotify + YouTube</p>
           </div>
 
-          <div className="flex gap-3 mb-6">
+          <div className="flex flex-col md:flex-row gap-3 mb-6">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSpotifySearch()}
-              placeholder="Ex: Bohemian Rhapsody..."
-              className="flex-1 px-4 py-3 bg-gray-800 border-2 border-gray-700 rounded-xl text-white focus:border-purple-500 focus:outline-none"
+              placeholder="Buscar música..."
+              className="flex-1 px-4 py-3 bg-gray-900 border-2 border-gray-800 rounded-xl text-white focus:border-purple-500 focus:outline-none"
             />
             <button
               onClick={handleSpotifySearch}
               disabled={isSearching}
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold disabled:opacity-50"
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSearching ? <Loader className="w-5 h-5 animate-spin" /> : 'Buscar'}
+              {isSearching ? <Loader className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+              <span className="hidden md:inline">Buscar</span>
             </button>
           </div>
 
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1 grid grid-cols-4 gap-2">
-              {['easy', 'medium', 'hard', 'expert'].map(level => (
-                <button
-                  key={level}
-                  onClick={() => setDifficulty(level)}
-                  className={`py-2 rounded-lg uppercase text-xs font-semibold ${
-                    difficulty === level ? 'bg-purple-600' : 'bg-gray-800'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setViewMode('upload')}
-              className="px-6 py-2 bg-gray-800 rounded-lg flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Upload
-            </button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            {['easy', 'medium', 'hard', 'expert'].map(level => (
+              <button
+                key={level}
+                onClick={() => setDifficulty(level)}
+                className={`py-2 rounded-lg uppercase text-xs font-bold ${
+                  difficulty === level ? 'bg-purple-600' : 'bg-gray-900'
+                }`}
+              >
+                {level}
+              </button>
+            ))}
           </div>
 
           {analysisError && (
@@ -479,29 +437,28 @@ const GuitarHeroGame = () => {
           {isAnalyzing && (
             <div className="text-center py-12">
               <Download className="w-16 h-16 mx-auto mb-4 text-purple-400 animate-bounce" />
-              <div className="text-xl font-semibold">Baixando e analisando...</div>
-              <div className="text-sm text-gray-400 mt-2">30-60 segundos</div>
+              <div className="text-xl font-semibold">Baixando...</div>
             </div>
           )}
 
           {searchResults.length > 0 && !isAnalyzing && (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {searchResults.map(track => (
-                <div key={track.id} className="bg-gray-800 rounded-lg overflow-hidden hover:border-2 hover:border-purple-500 cursor-pointer group">
+                <div key={track.id} className="bg-gray-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-purple-500 cursor-pointer group">
                   <div className="relative aspect-square">
                     <img src={track.image} alt={track.name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                       <button
                         onClick={() => handleSelectTrack(track)}
                         className="px-4 py-2 bg-purple-600 rounded-lg font-semibold flex items-center gap-2"
                       >
                         <Play className="w-4 h-4" />
-                        Jogar
+                        <span className="text-sm">Jogar</span>
                       </button>
                     </div>
                   </div>
-                  <div className="p-3">
-                    <div className="font-semibold text-sm truncate">{track.name}</div>
+                  <div className="p-2">
+                    <div className="font-semibold text-xs truncate">{track.name}</div>
                     <div className="text-xs text-gray-400 truncate">{track.artist}</div>
                   </div>
                 </div>
@@ -511,111 +468,216 @@ const GuitarHeroGame = () => {
         </div>
       )}
 
-      {viewMode === 'upload' && (
-        <div className="max-w-2xl mx-auto p-6">
-          <label className="cursor-pointer block">
-            <div className="flex flex-col items-center gap-6 p-16 border-4 border-dashed border-purple-500 rounded-2xl hover:border-pink-500 bg-black/30">
-              <Upload className="w-20 h-20 text-purple-400" />
-              <div className="text-2xl font-semibold">Upload MP3</div>
-            </div>
-            <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
-          </label>
-          <div className="mt-6 text-center">
-            <button onClick={() => setViewMode('search')} className="text-purple-400">← Voltar</button>
-          </div>
-        </div>
-      )}
-
       {viewMode === 'game' && notes.length > 0 && (
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="flex justify-center gap-4 mb-6">
-            <button onClick={togglePlay} className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg font-semibold flex items-center gap-2">
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              {isPlaying ? 'Pausar' : 'Jogar'}
-            </button>
-            <button onClick={resetGame} className="px-6 py-3 bg-gray-700 rounded-lg font-semibold flex items-center gap-2">
-              <RotateCcw className="w-5 h-5" />
-              Reiniciar
-            </button>
-            <button onClick={newSong} className="px-6 py-3 bg-pink-600 rounded-lg font-semibold flex items-center gap-2">
-              <Search className="w-5 h-5" />
-              Nova
-            </button>
-          </div>
-
-          <div className="grid grid-cols-5 gap-4 mb-6">
-            <div className="bg-green-900/30 p-4 rounded-lg text-center border border-green-500/30">
-              <div className="text-xs text-gray-400">Acertos</div>
-              <div className="text-2xl font-bold text-green-400">{notesHit}</div>
-            </div>
-            <div className="bg-red-900/30 p-4 rounded-lg text-center border border-red-500/30">
-              <div className="text-xs text-gray-400">Erros</div>
-              <div className="text-2xl font-bold text-red-400">{notesMissed}</div>
-            </div>
-            <div className="bg-orange-900/30 p-4 rounded-lg text-center border border-orange-500/30">
-              <div className="text-xs text-gray-400">Max Combo</div>
-              <div className="text-2xl font-bold text-orange-400">{maxCombo}x</div>
-            </div>
-            <div className="bg-purple-900/30 p-4 rounded-lg text-center border border-purple-500/30">
-              <div className="text-xs text-gray-400">Mult</div>
-              <div className="text-2xl font-bold text-purple-400">{multiplier}x {multiplier >= 4 && <Flame className="inline w-5 h-5" />}</div>
-            </div>
-            <div className="bg-blue-900/30 p-4 rounded-lg text-center border border-blue-500/30">
-              <div className="text-xs text-gray-400">Total</div>
-              <div className="text-2xl font-bold text-blue-400">{notes.length}</div>
+        <div className="relative h-screen flex flex-col">
+          {/* HUD Superior */}
+          <div className="absolute top-0 left-0 right-0 z-30 p-2 md:p-4 bg-gradient-to-b from-black/90 to-transparent">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div className="flex gap-2 md:gap-4">
+                <div className="text-center">
+                  <div className="text-xs text-gray-400">Score</div>
+                  <div className="text-lg md:text-2xl font-bold text-yellow-400">{score.toLocaleString()}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-gray-400">Combo</div>
+                  <div className="text-lg md:text-2xl font-bold text-pink-400">{combo}x</div>
+                </div>
+                {multiplier > 1 && (
+                  <div className="text-center">
+                    <div className="text-xs text-gray-400">Mult</div>
+                    <div className="text-lg md:text-2xl font-bold text-orange-400 flex items-center gap-1">
+                      {multiplier}x {multiplier >= 4 && <Flame className="w-4 h-4" />}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button onClick={newSong} className="px-3 py-1 md:px-4 md:py-2 bg-purple-600 rounded-lg text-sm font-semibold">
+                Nova
+              </button>
             </div>
           </div>
 
-          <div className="h-[600px] bg-gradient-to-b from-gray-900 to-black rounded-xl overflow-hidden border-4 border-purple-500 relative">
-            <div className="absolute inset-0 flex">
-              {displayLanes.map((lane, i) => (
-                <div key={lane} className="flex-1 border-r-2 border-gray-800 transition-all" style={{ backgroundColor: pressedKeys.has(lane) ? `${displayColors[i]}30` : 'transparent' }} />
-              ))}
-            </div>
-
-            <div className="absolute inset-x-0 h-24 border-y-4 border-yellow-400 bg-yellow-400/10 z-10" style={{ top: `${TARGET_Y - HIT_ZONE/2}px` }}>
-              <div className="flex h-full">
+          {/* Pista de Jogo - Estilo Guitar Hero */}
+          <div className="flex-1 relative" style={{ 
+            background: 'linear-gradient(180deg, #000 0%, #111 50%, #000 100%)',
+            perspective: '1000px'
+          }}>
+            <div className="absolute inset-0" style={{
+              transform: 'rotateX(60deg) translateZ(-200px)',
+              transformOrigin: 'center bottom'
+            }}>
+              {/* Faixas com perspectiva */}
+              <div className="absolute inset-0 flex">
                 {displayLanes.map((lane, i) => (
-                  <div key={lane} className="flex-1 flex items-center justify-center border-r border-yellow-400">
-                    <div className={`text-5xl font-bold ${pressedKeys.has(lane) ? 'scale-125 text-white' : 'text-gray-700'}`}>{lane}</div>
+                  <div
+                    key={lane}
+                    className="flex-1 relative"
+                    style={{
+                      background: `linear-gradient(180deg, transparent 0%, ${displayColors[i]}10 100%)`,
+                      borderRight: i < displayLanes.length - 1 ? '2px solid rgba(255,255,255,0.1)' : 'none'
+                    }}
+                  >
+                    {/* Linhas de perspectiva */}
+                    <div className="absolute inset-y-0 left-1/2 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
                   </div>
                 ))}
               </div>
+
+              {/* Notas */}
+              <div className="absolute inset-0">
+                {notes.map(note => {
+                  if (note.hit || note.missed || note.y < SPAWN_HEIGHT || note.y > 650 || note.lane >= activeLanes) return null;
+                  const color = displayColors[note.lane];
+                  const laneW = 100 / activeLanes;
+                  const laneL = (note.lane / activeLanes) * 100;
+                  const scale = 0.4 + ((note.y / 600) * 0.6);
+
+                  return (
+                    <div key={note.id}>
+                      {/* Cauda hold note */}
+                      {note.type === 'hold' && (
+                        <div 
+                          className="absolute"
+                          style={{
+                            bottom: `${650 - note.y}px`,
+                            left: `${laneL}%`,
+                            width: `${laneW}%`,
+                            height: `${note.duration * NOTE_SPEED * scale}px`,
+                            zIndex: 2,
+                            transform: `scale(${scale})`,
+                            transformOrigin: 'bottom center'
+                          }}
+                        >
+                          <div 
+                            className="mx-auto h-full rounded"
+                            style={{
+                              width: '60%',
+                              background: `linear-gradient(to top, ${color}DD, ${color}AA, ${color}77)`,
+                              border: `3px solid ${color}`,
+                              opacity: note.holding ? 0.95 : 0.8,
+                              boxShadow: `0 0 20px ${color}80`
+                            }}
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Nota circular */}
+                      <div
+                        className="absolute flex items-center justify-center"
+                        style={{
+                          top: `${note.y}px`,
+                          left: `${laneL}%`,
+                          width: `${laneW}%`,
+                          height: '80px',
+                          zIndex: 4,
+                          transform: `scale(${scale})`,
+                          transformOrigin: 'center'
+                        }}
+                      >
+                        <div 
+                          className="relative rounded-full"
+                          style={{
+                            width: '70px',
+                            height: '70px',
+                            backgroundColor: color,
+                            border: '5px solid white',
+                            boxShadow: `
+                              0 0 30px ${color},
+                              inset 0 -10px 20px rgba(0,0,0,0.3),
+                              inset 0 10px 20px rgba(255,255,255,0.3)
+                            `
+                          }}
+                        >
+                          {/* Brilho */}
+                          <div className="absolute top-2 left-4 w-6 h-4 rounded-full bg-white opacity-60 blur-sm" />
+                          
+                          {/* Indicador hold */}
+                          {note.type === 'hold' && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full border-4 border-white" style={{
+                                backgroundColor: note.holding ? 'white' : 'transparent'
+                              }} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {notes.map(note => {
-              if (note.hit || note.missed || note.y < SPAWN_HEIGHT || note.y > 650 || note.lane >= activeLanes) return null;
-              const color = displayColors[note.lane];
-              const laneW = 100 / activeLanes;
-              const laneL = (note.lane / activeLanes) * 100;
-
-              return (
-                <div key={note.id}>
-                  {note.type === 'hold' && (
-                    <div className="absolute" style={{ bottom: `${650 - note.y}px`, left: `${laneL}%`, width: `${laneW}%`, height: `${note.duration * NOTE_SPEED}px`, zIndex: 3 }}>
-                      <div className="mx-8 h-full rounded" style={{ background: `linear-gradient(to top, ${color}DD, ${color}BB, ${color}88)`, border: `2px solid ${color}`, opacity: 0.85 }} />
-                    </div>
-                  )}
-                  <div className="absolute flex items-center justify-center" style={{ top: `${note.y}px`, left: `${laneL}%`, width: `${laneW}%`, height: '56px', zIndex: 5 }}>
-                    <div className="w-4/5 h-14 max-w-[70px] rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 40px ${color}`, border: '4px solid white' }} />
+            {/* Zona de acerto - Aros coloridos */}
+            <div className="absolute bottom-20 md:bottom-32 left-0 right-0 z-20 flex justify-center items-center gap-1">
+              {displayLanes.map((lane, i) => (
+                <div
+                  key={lane}
+                  className="relative"
+                  style={{ width: isMobile ? '60px' : '90px', height: isMobile ? '60px' : '90px' }}
+                  onTouchStart={isMobile ? () => handleMobileTouch(i, 'down') : undefined}
+                  onTouchEnd={isMobile ? () => handleMobileTouch(i, 'up') : undefined}
+                >
+                  <div 
+                    className="absolute inset-0 rounded-full transition-all duration-100"
+                    style={{
+                      border: `6px solid ${displayColors[i]}`,
+                      backgroundColor: pressedKeys.has(lane) ? `${displayColors[i]}40` : 'rgba(0,0,0,0.5)',
+                      boxShadow: pressedKeys.has(lane) 
+                        ? `0 0 30px ${displayColors[i]}, inset 0 0 20px ${displayColors[i]}`
+                        : `0 0 15px ${displayColors[i]}80`,
+                      transform: pressedKeys.has(lane) ? 'scale(0.9)' : 'scale(1)'
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-xl md:text-3xl font-black ${
+                      pressedKeys.has(lane) ? 'text-white' : 'text-gray-600'
+                    }`}>
+                      {isMobile ? (i + 1) : lane}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* Controles Mobile */}
+            {isMobile && (
+              <div className="absolute bottom-2 left-0 right-0 z-30 flex justify-center gap-2">
+                <button onClick={togglePlay} className="px-6 py-3 bg-purple-600 rounded-full font-bold">
+                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                </button>
+                <button onClick={resetGame} className="px-6 py-3 bg-gray-700 rounded-full">
+                  <RotateCcw className="w-6 h-6" />
+                </button>
+              </div>
+            )}
+
+            {/* Controles Desktop */}
+            {!isMobile && (
+              <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-30 flex gap-3">
+                <button onClick={togglePlay} className="px-6 py-3 bg-purple-600 rounded-lg font-bold flex items-center gap-2">
+                  {isPlaying ? <><Pause className="w-5 h-5" />Pausar</> : <><Play className="w-5 h-5" />Jogar</>}
+                </button>
+                <button onClick={resetGame} className="px-6 py-3 bg-gray-700 rounded-lg font-bold flex items-center gap-2">
+                  <RotateCcw className="w-5 h-5" />Reiniciar
+                </button>
+              </div>
+            )}
 
             {!isPlaying && (
-              <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20">
+              <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-25">
                 <div className="text-center">
                   <Play className="w-20 h-20 mx-auto mb-4 text-purple-400" />
-                  <div className="text-2xl font-bold">Clique em Jogar!</div>
+                  <div className="text-2xl font-bold">
+                    {isMobile ? 'Toque nos círculos!' : 'Clique em Jogar!'}
+                  </div>
+                  {!isMobile && (
+                    <div className="mt-2 text-gray-400">
+                      Teclas: {displayLanes.join(' ')}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="mt-6 text-center text-gray-400">
-            <p>Teclas: <span className="font-bold text-white">{displayLanes.join(' ')}</span></p>
-            <p className="text-sm mt-2">Segure para hold notes! 🎹</p>
           </div>
         </div>
       )}

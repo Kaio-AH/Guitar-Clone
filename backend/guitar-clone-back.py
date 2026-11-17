@@ -11,7 +11,8 @@ Configuração:
 1. Crie um app em: https://developer.spotify.com/dashboard
 2. Adicione Redirect URI: http://127.0.0.1:5000/callback
 3. Copie Client ID e Client Secret
-4. Cole abaixo nas variáveis SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET
+4. Defina as variáveis de ambiente SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET
+   (nunca comite credenciais reais no código)
 
 Uso:
 python guitar_hero_backend_v3.py
@@ -36,10 +37,12 @@ app = Flask(__name__)
 CORS(app)
 
 # ============================================================
-# CONFIGURAÇÃO DO SPOTIFY - ADICIONE SUAS CREDENCIAIS AQUI!
+# CONFIGURAÇÃO DO SPOTIFY - use variáveis de ambiente
+#   set SPOTIFY_CLIENT_ID=...
+#   set SPOTIFY_CLIENT_SECRET=...
 # ============================================================
-SPOTIFY_CLIENT_ID = 'sua_chave_api'
-SPOTIFY_CLIENT_SECRET = 'seu_client_secret_id'
+SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID', 'sua_chave_api')
+SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', 'seu_client_secret_id')
 
 # Configurações gerais
 UPLOAD_FOLDER = tempfile.gettempdir()
@@ -58,7 +61,7 @@ audio_cache = {}
 
 # Inicializa Spotify Client
 try:
-    if SPOTIFY_CLIENT_ID != 'SEU_CLIENT_ID_AQUI':
+    if SPOTIFY_CLIENT_ID not in ('', 'sua_chave_api', 'SEU_CLIENT_ID_AQUI'):
         spotify = SpotifyClientCredentials(
             client_id=SPOTIFY_CLIENT_ID,
             client_secret=SPOTIFY_CLIENT_SECRET
@@ -79,90 +82,152 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _build_ydl_opts(outtmpl, player_clients, fmt):
+    """Monta as opções do yt-dlp para uma tentativa específica"""
+    opts = {
+        'format': fmt,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'outtmpl': outtmpl,
+        'quiet': False,
+        'no_warnings': False,
+        'noplaylist': True,
+        'nocheckcertificate': True,
+        'retries': 3,
+        'fragment_retries': 3,
+        'socket_timeout': 20,
+        # Baixar em pedaços evita 403 por throttling do googlevideo
+        'http_chunk_size': 10 * 1024 * 1024,
+        # Runtime JS (Deno) + solver EJS: exigidos pelo YouTube em 2026
+        'js_runtimes': {'deno': {}, 'node': {}},
+        'remote_components': ['ejs:github'],
+    }
+    # player_clients=None -> deixa o yt-dlp escolher os clients padrão (recomendado)
+    if player_clients:
+        opts['extractor_args'] = {'youtube': {'player_client': player_clients}}
+
+    # Cookies (opcional, ajuda com 403 persistente e vídeos com restrição)
+    #   export YT_COOKIES_FILE=/caminho/cookies.txt
+    #   export YT_COOKIES_BROWSER=chrome   (ou firefox, edge, brave...)
+    cookies_file = os.environ.get('YT_COOKIES_FILE')
+    cookies_browser = os.environ.get('YT_COOKIES_BROWSER')
+    if cookies_file and os.path.exists(cookies_file):
+        opts['cookiefile'] = cookies_file
+    elif cookies_browser:
+        opts['cookiesfrombrowser'] = (cookies_browser,)
+
+    return opts
+
+
+def _cleanup_partial_files(cache_id):
+    """Remove arquivos parciais/temporários de uma tentativa que falhou"""
+    try:
+        for name in os.listdir(AUDIO_CACHE_FOLDER):
+            if name.startswith(cache_id) and not name.endswith('.mp3'):
+                os.remove(os.path.join(AUDIO_CACHE_FOLDER, name))
+    except Exception:
+        pass
+
+
 def search_youtube_and_download(query, use_cache=True):
     """
-    Busca e baixa áudio do YouTube com sistema de cache
-    
+    Busca e baixa áudio do YouTube com sistema de cache.
+    Tenta vários player clients do yt-dlp em sequência, porque o YouTube
+    bloqueia (403) alguns clients (web/web_safari exigem PO token / SABR).
+
     Args:
         query: string de busca (ex: "Queen - Bohemian Rhapsody")
         use_cache: usar cache de downloads anteriores
-    
+
     Returns:
         (filepath, cache_id) ou (None, None) se falhar
     """
-    # Gera ID único para o cache baseado na query
     cache_id = hashlib.md5(query.encode()).hexdigest()
     cached_path = os.path.join(AUDIO_CACHE_FOLDER, f"{cache_id}.mp3")
-    
-    # Verifica se já está em cache
+
     if use_cache and os.path.exists(cached_path):
         print(f"♻️  Usando áudio do cache: {query}")
         return cached_path, cache_id
-    
+
+    outtmpl = cached_path.replace('.mp3', '.%(ext)s')
+
+    # 1) Busca só os metadados (sem baixar) para obter a URL do vídeo
     try:
         print(f"🔍 Buscando no YouTube: {query}")
-        
-        # Configurações do yt-dlp
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': cached_path.replace('.mp3', '.%(ext)s'),
-            'quiet': False,
-            'no_warnings': False,
-            'extract_flat': False,
-            'default_search': 'ytsearch1',
-            'age_limit': None,
-            'nocheckcertificate': True,
+        search_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'noplaylist': True,
         }
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"📥 Tentando extrair informações...")
-            info = ydl.extract_info(f"ytsearch1:{query}", download=True)
-            
-            if 'entries' in info:
-                info = info['entries'][0]
-            
-            print(f"📹 Vídeo encontrado:")
-            print(f"   - Título: {info.get('title', 'N/A')}")
-            print(f"   - Canal: {info.get('uploader', 'N/A')}")
-            print(f"   - Duração: {info.get('duration', 0)}s")
-            
-            # Verifica se o arquivo foi criado
+        with yt_dlp.YoutubeDL(search_opts) as ydl:
+            result = ydl.extract_info(f"ytsearch1:{query}", download=False)
+        entries = (result or {}).get('entries') or []
+        if not entries:
+            print("❌ Nenhum resultado encontrado no YouTube")
+            return None, None
+        video_url = entries[0].get('url') or f"https://www.youtube.com/watch?v={entries[0]['id']}"
+        print(f"📹 Vídeo encontrado: {entries[0].get('title', 'N/A')} -> {video_url}")
+    except Exception as e:
+        print(f"❌ Erro na busca do YouTube: {e}")
+        return None, None
+
+    # 2) Tenta baixar com diferentes clients/formatos até um funcionar
+    attempts = [
+        (None,                 'bestaudio[ext=m4a]/bestaudio/best'),  # padrão do yt-dlp
+        (['android_vr'],       'bestaudio[ext=m4a]/bestaudio/best'),
+        (['tv'],               'bestaudio/best'),
+        (['android_vr', 'tv'], 'best'),   # último recurso
+    ]
+
+    last_error = None
+    for i, (clients, fmt) in enumerate(attempts, 1):
+        try:
+            print(f"📥 Tentativa {i}/{len(attempts)} (clients={clients or 'padrão'}, format={fmt})")
+            with yt_dlp.YoutubeDL(_build_ydl_opts(outtmpl, clients, fmt)) as ydl:
+                info = ydl.extract_info(video_url, download=True)
+
             if os.path.exists(cached_path):
                 file_size = os.path.getsize(cached_path) / (1024 * 1024)
-                print(f"✅ Download completo: {info['title']}")
+                if file_size < 0.05:
+                    raise yt_dlp.utils.DownloadError("Arquivo baixado está vazio/corrompido")
+
+                title = info.get('title', query)
+                print(f"✅ Download completo: {title}")
                 print(f"   - Cache ID: {cache_id}")
                 print(f"   - Tamanho: {file_size:.2f}MB")
-                
-                # Adiciona ao cache em memória
+
                 audio_cache[cache_id] = {
                     'query': query,
                     'filepath': cached_path,
-                    'title': info['title'],
+                    'title': title,
                     'timestamp': time.time()
                 }
-                
                 return cached_path, cache_id
-            else:
-                print(f"❌ Arquivo não foi criado")
-                return None, None
-            
-    except yt_dlp.utils.DownloadError as e:
-        print(f"❌ Erro de download do YouTube: {str(e)}")
-        if 'age' in str(e).lower():
-            print(f"   💡 Possível vídeo com restrição de idade")
-        if 'copyright' in str(e).lower():
-            print(f"   💡 Possível bloqueio por copyright")
-        return None, None
-    except Exception as e:
-        print(f"❌ Erro inesperado: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None, None
+
+            raise yt_dlp.utils.DownloadError("Arquivo mp3 não foi criado")
+
+        except yt_dlp.utils.DownloadError as e:
+            last_error = str(e)
+            print(f"⚠️  Tentativa {i} falhou: {last_error[:200]}")
+            _cleanup_partial_files(cache_id)
+            low = last_error.lower()
+            if 'sign in to confirm' in low or 'age' in low:
+                print("   💡 Vídeo com restrição: configure YT_COOKIES_FILE ou YT_COOKIES_BROWSER")
+            time.sleep(1)
+        except Exception as e:
+            last_error = str(e)
+            print(f"⚠️  Tentativa {i} erro inesperado: {last_error[:200]}")
+            _cleanup_partial_files(cache_id)
+
+    print(f"❌ Todas as tentativas falharam. Último erro: {last_error}")
+    print("   💡 Atualize o yt-dlp:  python -m pip install -U yt-dlp")
+    print("   💡 Instale o Deno:     winget install DenoLand.Deno (e reabra o terminal)")
+    print("   💡 Ou use cookies:     export YT_COOKIES_BROWSER=chrome")
+    return None, None
 
 
 def detect_note_duration(y, sr, onset_time, max_duration=2.0):
