@@ -312,11 +312,6 @@ O primeiro download/analise pode demorar (yt-dlp + librosa). Depois o áudio fic
 em cache (`pygame-client/cache/` e a pasta temporária do sistema,
 `guitar_hero_cache`).
 
-A chart gerada cobre a música inteira: quando a introdução ou o final não têm
-percussão (e o detector de batidas não encontra beats), o backend extrapola a
-grade de notas a partir do intervalo médio da música. Assim a partida não fica
-vários segundos sem notas no começo nem no fim.
-
 ---
 
 ## 7. Variáveis de ambiente
