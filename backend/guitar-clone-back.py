@@ -391,6 +391,73 @@ def analyze_audio(file_path, difficulty='medium'):
         }
 
 
+def _extend_note_grid(times, total_duration, min_time_gap, start_margin=1.0, end_margin=2.0):
+    """Completa a grade de tempos nas bordas e nos vazios longos da musica.
+
+    O detector de batidas do librosa nao encontra beats em trechos sem
+    percussao (introducao instrumental, final em fade). Sem isso a chart podia
+    ficar 10s ou mais sem nenhuma nota no comeco ou no fim da musica. Aqui
+    extrapolamos a grade usando o intervalo mediano dos tempos detectados.
+
+    Args:
+        times: tempos (segundos) ja filtrados pela dificuldade
+        total_duration: duracao total do audio
+        min_time_gap: intervalo minimo entre notas da dificuldade
+        start_margin: primeiro instante que pode receber nota
+        end_margin: segundos finais que ficam sem nota (fim da musica)
+
+    Returns:
+        Lista de tempos ordenada cobrindo as bordas da musica (com passo
+        proximo de ``interval``), sem notas nos ``end_margin`` segundos finais.
+    """
+    start_limit = float(start_margin)
+    end_limit = float(total_duration - end_margin)
+    grid = sorted(float(t) for t in times)
+    if end_limit <= start_limit:
+        return grid
+
+    if len(grid) >= 2:
+        gaps = [b - a for a, b in zip(grid, grid[1:]) if b - a > 0]
+        interval = float(np.median(gaps)) if gaps else float(min_time_gap)
+    else:
+        interval = float(min_time_gap)
+
+    # Nunca menor que o gap minimo da dificuldade e nunca grande o bastante
+    # para deixar buracos visiveis na chart.
+    interval = min(max(interval, float(min_time_gap)), 2.0)
+    max_gap = max(interval * 2.0, float(min_time_gap) * 2.0)
+
+    # 1) Preenche vazios internos maiores que max_gap.
+    if grid:
+        filled = [grid[0]]
+        for time in grid[1:]:
+            previous = filled[-1]
+            gap = time - previous
+            if gap > max_gap:
+                steps = int(gap / interval)
+                for k in range(1, steps + 1):
+                    candidate = previous + k * interval
+                    if time - candidate >= min_time_gap:
+                        filled.append(candidate)
+            filled.append(time)
+        grid = filled
+    else:
+        # Nenhum beat detectado: usa uma grade regular.
+        grid = [start_limit]
+        while grid[-1] + interval <= end_limit:
+            grid.append(grid[-1] + interval)
+
+    # 2) Estende para tras ate o inicio da musica.
+    while grid[0] - interval >= start_limit:
+        grid.insert(0, grid[0] - interval)
+
+    # 3) Estende para frente ate o fim da musica.
+    while grid[-1] + interval <= end_limit:
+        grid.append(grid[-1] + interval)
+
+    return grid
+
+
 def generate_notes_with_duration(y, sr, beat_times, onset_times, spectral_centroids, chroma, difficulty, total_duration):
     """Gera notas do jogo COM DURAÇÃO"""
     notes = []
@@ -456,8 +523,13 @@ def generate_notes_with_duration(y, sr, beat_times, onset_times, spectral_centro
     
     step = max(1, int(1 / config['density']))
     selected_times = filtered_times[::step]
-    
-    print(f"Gerando notas - Tempos totais: {len(all_times)}, Filtrados: {len(filtered_times)}, Selecionados: {len(selected_times)}")
+
+    # Intro/outro sem percussao nao geram beats: completa a grade para a
+    # chart nao comecar/terminar com longos trechos mudos.
+    before_extension = len(selected_times)
+    selected_times = _extend_note_grid(selected_times, total_duration, min_time_gap)
+
+    print(f"Gerando notas - Tempos totais: {len(all_times)}, Filtrados: {len(filtered_times)}, Selecionados: {before_extension} (+{len(selected_times) - before_extension} nas bordas/vazios)")
     
     lane_counts = [0] * num_lanes
     
@@ -516,6 +588,8 @@ def generate_notes_with_duration(y, sr, beat_times, onset_times, spectral_centro
     hold_count = sum(1 for n in notes if n['type'] == 'hold')
     print(f"Notas geradas: {len(notes)} total ({hold_count} hold notes)")
     print(f"Distribuição por lane: {lane_counts}")
+    if notes:
+        print(f"Cobertura: primeira nota {notes[0]['time']:.2f}s, última {notes[-1]['time']:.2f}s de {total_duration:.2f}s")
     
     return notes
 
