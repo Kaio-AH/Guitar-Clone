@@ -32,6 +32,7 @@ import yt_dlp
 import re
 import hashlib
 import time
+import threading
 
 
 def _load_env_file() -> None:
@@ -168,6 +169,28 @@ def _cleanup_partial_files(cache_id):
         pass
 
 
+def _valid_cached_audio(path):
+    """Retorna True se o mp3 existe e tem tamanho plausivel."""
+    try:
+        return os.path.isfile(path) and os.path.getsize(path) > 64 * 1024
+    except OSError:
+        return False
+
+
+_download_locks = {}
+_download_locks_guard = threading.Lock()
+
+
+def _download_lock(cache_id):
+    """Lock por cache_id: evita dois downloads simultaneos da mesma consulta."""
+    with _download_locks_guard:
+        lock = _download_locks.get(cache_id)
+        if lock is None:
+            lock = threading.Lock()
+            _download_locks[cache_id] = lock
+        return lock
+
+
 def search_youtube_and_download(query, use_cache=True):
     """
     Busca e baixa áudio do YouTube com sistema de cache.
@@ -184,10 +207,20 @@ def search_youtube_and_download(query, use_cache=True):
     cache_id = hashlib.md5(query.encode()).hexdigest()
     cached_path = os.path.join(AUDIO_CACHE_FOLDER, f"{cache_id}.mp3")
 
-    if use_cache and os.path.exists(cached_path):
+    if use_cache and _valid_cached_audio(cached_path):
         print(f"♻️  Usando áudio do cache: {query}")
         return cached_path, cache_id
 
+    # Serializa downloads da mesma consulta: se duas requisicoes chegarem
+    # juntas, a segunda espera e reaproveita o arquivo da primeira.
+    with _download_lock(cache_id):
+        if use_cache and _valid_cached_audio(cached_path):
+            print(f"♻️  Usando áudio do cache: {query}")
+            return cached_path, cache_id
+        return _download_from_youtube(query, cache_id, cached_path)
+
+
+def _download_from_youtube(query, cache_id, cached_path):
     outtmpl = cached_path.replace('.mp3', '.%(ext)s')
 
     # 1) Busca só os metadados (sem baixar) para obter a URL do vídeo
@@ -226,11 +259,8 @@ def search_youtube_and_download(query, use_cache=True):
             with yt_dlp.YoutubeDL(_build_ydl_opts(outtmpl, clients, fmt)) as ydl:
                 info = ydl.extract_info(video_url, download=True)
 
-            if os.path.exists(cached_path):
+            if _valid_cached_audio(cached_path):
                 file_size = os.path.getsize(cached_path) / (1024 * 1024)
-                if file_size < 0.05:
-                    raise yt_dlp.utils.DownloadError("Arquivo baixado está vazio/corrompido")
-
                 title = info.get('title', query)
                 print(f"✅ Download completo: {title}")
                 print(f"   - Cache ID: {cache_id}")
@@ -250,6 +280,9 @@ def search_youtube_and_download(query, use_cache=True):
             last_error = str(e)
             print(f"⚠️  Tentativa {i} falhou: {last_error[:200]}")
             _cleanup_partial_files(cache_id)
+            if _valid_cached_audio(cached_path):
+                print("✅ Áudio íntegro já estava no cache após a falha; usando-o.")
+                return cached_path, cache_id
             low = last_error.lower()
             if 'sign in to confirm' in low or 'age' in low:
                 print("   💡 Vídeo com restrição: configure YT_COOKIES_FILE ou YT_COOKIES_BROWSER")
@@ -258,6 +291,15 @@ def search_youtube_and_download(query, use_cache=True):
             last_error = str(e)
             print(f"⚠️  Tentativa {i} erro inesperado: {last_error[:200]}")
             _cleanup_partial_files(cache_id)
+            if _valid_cached_audio(cached_path):
+                print("✅ Áudio íntegro já estava no cache após a falha; usando-o.")
+                return cached_path, cache_id
+
+    # Último recurso: o arquivo pode ter sido criado por outra tentativa ou
+    # por outra requisicao antes de um erro de rename no Windows.
+    if _valid_cached_audio(cached_path):
+        print("✅ Áudio íntegro encontrado no cache; retornando sem novo download.")
+        return cached_path, cache_id
 
     print(f"❌ Todas as tentativas falharam. Último erro: {last_error}")
     print("   💡 Atualize o yt-dlp:  python -m pip install -U yt-dlp")
