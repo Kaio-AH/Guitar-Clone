@@ -197,7 +197,6 @@ class App:
 
         self.demo_on_start = demo
         self.demo_title = DEMO_TITLE
-        self.crowd_at: float | None = None
 
     # ------------------------------------------------------------------ loop
     def run(self) -> None:
@@ -295,9 +294,6 @@ class App:
     def _update(self, dt: float, now: int) -> None:
         self.starfield.update(dt)
         self.toast.time = max(0.0, self.toast.time - dt)
-        if self.crowd_at is not None and now >= self.crowd_at:
-            self.crowd_at = None
-            self.sfx.play("crowd", 0.8)
         if self.health_task is not None and self.health_task.done:
             self.backend_status = "online" if self.health_task.result and not self.health_task.error else "offline"
             self.health_task = None
@@ -614,8 +610,6 @@ class App:
         if self.last_track is None:
             self.back_to_search()
             return
-        self.crowd_at = None
-        self.sfx.stop("crowd")
         try:
             pygame.mixer.music.stop()
         except pygame.error:
@@ -635,12 +629,8 @@ class App:
         except pygame.error:
             pass
         self.sfx.play("finish", 0.5)
-        # Plateia entra logo depois do jingle, como se o show estivesse acabando.
-        self.crowd_at = pygame.time.get_ticks() + 420
 
     def back_to_search(self) -> None:
-        self.crowd_at = None
-        self.sfx.stop("crowd")
         try:
             pygame.mixer.music.stop()
         except pygame.error:

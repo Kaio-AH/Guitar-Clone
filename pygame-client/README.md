@@ -17,8 +17,8 @@ e resultados.
 - Pausa, reinicio, tela de resultados, HUD, particulas e popups.
 - Chart normalizada no cliente: notas bem espacadas, holds nunca atravessam
   outra nota do mesmo lane.
-- Resultado com a nota em destaque (sem circulo), metricas centralizadas e
-  aplausos/gritos de plateia ao fim da musica (sintetizados, sem estourar).
+- Resultado com a nota em destaque (sem circulo) e metricas centralizadas.
+- Sem SFX de plateia: o fim da musica toca apenas o jingle de interface.
 - Menu inicial limpo: pill ONLINE so com o ping verde e box da logo sem borda.
 - Cache local de audios e capas carregadas em background.
 
@@ -105,7 +105,7 @@ pygame-client/
   highway.py       geometria da perspectiva
   api.py           cliente HTTP do backend
   images.py        capas em background
-  sound.py         SFX de interface e plateia do fim do show
+  sound.py         SFX de interface (click e jingle de fim)
   demo.py          faixa + chart demo locais
   ui.py            fontes, gradientes, glow, vinil
   config.py        constantes/cores
