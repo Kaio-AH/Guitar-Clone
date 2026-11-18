@@ -384,6 +384,8 @@ Logs de falha do cliente ficam em `pygame-client/crash.log`.
 
 ## 10. Documentação específica
 
+- `backend/README.md` — funcionamento do backend: endpoints, download do
+  YouTube, cache, análise de áudio e geração da chart.
 - `pygame-client/README.md` — detalhes do cliente desktop, estrutura e ajustes.
 - `frontend/README.md` — template padrão do Vite/React.
 
