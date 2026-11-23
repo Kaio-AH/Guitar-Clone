@@ -116,6 +116,9 @@ Modelo pronto: `backend/.env.example`. O `backend/.env` é ignorado pelo Git.
 | `AUDIO_CACHE_FOLDER` | `<temp>/guitar_hero_cache` | MP3 baixados e reaproveitados |
 | `ALLOWED_EXTENSIONS` | `mp3`, `wav`, `ogg`, `flac`, `m4a` | validação do upload |
 | `MAX_FILE_SIZE` | 50 MiB | limite do corpo do upload (HTTP 413 acima disso) |
+| `SPOTIFY_REQUEST_TIMEOUT` | 10 s | timeout de cada requisição ao Spotify |
+| `SPOTIFY_SEARCH_ATTEMPTS` | 3 | tentativas por busca no Spotify |
+| `SPOTIFY_SEARCH_RETRY_DELAY` | 0,5 s | pausa entre tentativas |
 | `audio_cache` | dicionário em memória | metadados de cada `cache_id` baixado |
 
 No Windows, `<temp>` costuma ser `C:\Users\<usuário>\AppData\Local\Temp`; no
@@ -184,6 +187,17 @@ Códigos: `400` sem `q`, `503` Spotify não configurado, `500` erro da API.
 O backend usa apenas o *Client Credentials* do Spotify: não acessa a conta do
 usuário, playlists ou histórico. `preview_url` é o trecho de 30 s (pode vir
 `null`).
+
+A busca usa **10 s de timeout por requisição** e tenta até **3 vezes** (com
+0,5 s entre tentativas) quando ocorre erro de rede/DNS ou erro da API do
+Spotify. Isso absorve engasgos típicos de conexões móveis: a primeira tentativa
+pode falhar e a segunda já retornar os resultados. Se todas falharem, a
+resposta é `500` com a última exceção. O token de acesso é guardado pelo
+`spotipy` em `backend/.cache` (válido por ~1 h), então as buscas seguintes
+geralmente fazem só uma requisição.
+
+> A mensagem `✅ Spotify API conectada!` no startup indica apenas que as
+> credenciais foram lidas; ela não faz teste de rede.
 
 ### 4.3 `POST /analyze/youtube`
 
@@ -451,7 +465,8 @@ O backend imprime logs com emoji no console. Linhas comuns:
 
 | Log | Significado |
 | --- | --- |
-| `✅ Spotify API conectada!` | credenciais aceitas |
+| `✅ Spotify API conectada!` | credenciais lidas (não testa a rede) |
+| `⚠️ Busca no Spotify falhou (tentativa N/3)` | erro de rede/DNS; nova tentativa em 0,5 s |
 | `♻️ Usando áudio do cache` | MP3 válido reaproveitado |
 | `🔍 Buscando no YouTube` / `📹 Vídeo encontrado` | busca de metadados |
 | `📥 Tentativa N/4` | início de uma tentativa de download |

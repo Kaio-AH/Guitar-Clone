@@ -26,6 +26,7 @@ import os
 import json
 from werkzeug.utils import secure_filename
 import tempfile
+import requests
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import yt_dlp
@@ -87,6 +88,13 @@ AUDIO_CACHE_FOLDER = os.path.join(tempfile.gettempdir(), 'guitar_hero_cache')
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'flac', 'm4a'}
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
+# Busca no Spotify: rede instavel (DNS/latencia) pode derrubar a primeira
+# tentativa. O timeout por requisicao somado as tentativas precisa caber no
+# timeout de leitura do cliente PyGame (35s em pygame-client/api.py).
+SPOTIFY_REQUEST_TIMEOUT = 10
+SPOTIFY_SEARCH_ATTEMPTS = 3
+SPOTIFY_SEARCH_RETRY_DELAY = 0.5
+
 # Cria pasta de cache se não existir
 os.makedirs(AUDIO_CACHE_FOLDER, exist_ok=True)
 
@@ -101,9 +109,13 @@ try:
     if SPOTIFY_CLIENT_ID not in ('', 'sua_chave_api', 'SEU_CLIENT_ID_AQUI'):
         spotify = SpotifyClientCredentials(
             client_id=SPOTIFY_CLIENT_ID,
-            client_secret=SPOTIFY_CLIENT_SECRET
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            requests_timeout=SPOTIFY_REQUEST_TIMEOUT,
         )
-        sp = spotipy.Spotify(client_credentials_manager=spotify)
+        sp = spotipy.Spotify(
+            client_credentials_manager=spotify,
+            requests_timeout=SPOTIFY_REQUEST_TIMEOUT,
+        )
         SPOTIFY_ENABLED = True
         print("✅ Spotify API conectada!")
     else:
@@ -564,8 +576,20 @@ def search_spotify():
     
     try:
         print(f"🔍 Buscando no Spotify: {query}")
-        results = sp.search(q=query, limit=limit, type='track')
-        
+        results = None
+        last_error = None
+        for attempt in range(1, SPOTIFY_SEARCH_ATTEMPTS + 1):
+            try:
+                results = sp.search(q=query, limit=limit, type='track')
+                break
+            except (requests.exceptions.RequestException, spotipy.SpotifyException) as exc:
+                last_error = exc
+                if attempt < SPOTIFY_SEARCH_ATTEMPTS:
+                    print(f"⚠️  Busca no Spotify falhou (tentativa {attempt}/{SPOTIFY_SEARCH_ATTEMPTS}): {exc}")
+                    time.sleep(SPOTIFY_SEARCH_RETRY_DELAY)
+        if results is None:
+            raise last_error
+
         tracks = []
         for item in results['tracks']['items']:
             track = {

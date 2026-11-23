@@ -372,7 +372,7 @@ No WSL, `YT_COOKIES_BROWSER` não enxerga o Chrome do Windows; exporte um
 | `UnicodeEncodeError` no backend | Defina `PYTHONIOENCODING=utf-8` antes de rodar |
 | `HTTP 403: Forbidden` no download | YouTube bloqueando acesso anônimo: configure `YT_COOKIES_FILE`/`YT_COOKIES_BROWSER`, ou use upload/demo |
 | `WinError 5` / `Unable to rename file` | Duas requisições baixavam a mesma música ao mesmo tempo. O backend agora serializa o download e reaproveita o `.mp3` já baixado |
-| Busca retorna erro | Spotify não configurado ou credenciais inválidas |
+| Busca retorna erro | Spotify não configurado, credenciais inválidas ou rede instável (o backend tenta 3 vezes; veja `backend/README.md`) |
 | Porta 5000 ocupada | Encerre o processo antigo (`Get-NetTCPConnection -LocalPort 5000` no PowerShell, `lsof -i :5000` no WSL) |
 | Sem áudio no WSL | Verifique WSLg (Windows 11) ou rode o cliente no Windows apontando para o backend no WSL |
 | Janela não abre no WSL | Windows 10 exige X server; prefira Windows 11/WSLg ou rode o cliente no Windows |
