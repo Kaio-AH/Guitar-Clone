@@ -367,15 +367,15 @@ partida termina ao final da faixa e o desempenho é representado pela nota S–F
 
 | Integrante (nome completo e RA) | Responsabilidades |
 | --- | --- |
-| `[PREENCHER]` | Cliente PyGame — estados, telas e áudio (`app.py`, `screens.py`, `scene_game.py`) |
-| `[PREENCHER]` | Regras e chart (`gameplay.py`, `chart.py`, `highway.py`, `demo.py`, `sound.py`, `ui.py`) |
-| `[PREENCHER]` | Backend Flask — endpoints, Spotify, YouTube e cache (`backend/guitar-clone-back.py`) |
-| `[PREENCHER]` | Análise de áudio e geração automática da chart (`librosa`) |
-| `[PREENCHER]` | Frontend React opcional (`frontend/`) |
-| `[PREENCHER]` | Documentação, testes, instalação e apresentação |
+| Renan Santos de Brito (8261104906) e Rafael Correia Ziroldo (825151686) | Cliente PyGame — estados, telas e áudio (`app.py`, `screens.py`, `scene_game.py`) |
+| Renan Santos de Brito (8261104906) | Regras e chart (`gameplay.py`, `chart.py`, `highway.py`, `demo.py`, `sound.py`, `ui.py`) |
+| Kaio Alcantara Henriques (82610454) | Backend Flask — endpoints, Spotify, YouTube e cache (`backend/guitar-clone-back.py`) |
+| Pedro Andrade Dionísio da Silva (8261103786), Gustavo Felipe (8261104111) e Kaio Alcantara Henriques (82610454) | Análise de áudio e geração automática da chart (`librosa`) |
+| Rafael Correia Ziroldo (825151686) | Frontend React opcional (`frontend/`) |
+| Murillo Rossetti Vieira (826185996) e Gabriel Lourenço (8261112697) | Documentação, testes, instalação e apresentação |
 
-> Atribuir conforme a participação real. Todos os integrantes devem estar
-> preparados para explicar qualquer parte do código na apresentação.
+> Todos os integrantes devem estar preparados para explicar qualquer parte do
+> código na apresentação.
 
 ---
 
