@@ -1,16 +1,16 @@
-# Guitar Clone Web
+# Guitar Clone
 
-Clone de Guitar Hero com backend Flask, frontend React e um cliente desktop em
-PyGame. O backend busca músicas no Spotify, baixa o áudio do YouTube, analisa o
-áudio e gera a chart automaticamente.
+Repositório do projeto: **Guitar Clone Web**.
+
+Jogo de ritmo inspirado em Guitar Hero: notas descem em uma pista de 3 a 5 faixas
+e devem ser acionadas no tempo da música. A chart é gerada automaticamente a
+partir do áudio, e a partida termina com pontuação, precisão e nota de S a F.
 
 ```
 backend/        API Flask (busca Spotify, download YouTube, análise, chart, cache)
-frontend/       interface web em React + Vite
+frontend/       interface web em React + Vite (opcional)
 pygame-client/  cliente desktop em PyGame (jogo completo)
 ```
-
-Este guia cobre **PowerShell (Windows)** e **WSL (Ubuntu/Debian)**.
 
 > Nos comandos abaixo, troque `C:\Projetos-Pessoais\guitar-clone-web` e
 > `~/guitar-clone-web` pelo caminho do seu clone. Os exemplos usam `python`; se
@@ -18,34 +18,55 @@ Este guia cobre **PowerShell (Windows)** e **WSL (Ubuntu/Debian)**.
 
 ---
 
-## Início rápido (só o jogo, sem backend)
+## 1. Identificação
 
-A demo gera a música e a chart localmente, sem Spotify, YouTube ou internet.
+| Campo | Valor |
+| --- | --- |
+| Trabalho | A3 — Desenvolvimento de um Jogo |
+| Unidade curricular | Usabilidade, desenvolvimento web, mobile e jogos |
+| Professor | Patricia Vitorino Gomes e Fabio Tadeu Doro |
+| Grupo | `Guitar Clone` |
+| Nome provisório do jogo | `Guitar Clone` (o nome técnico do repositório é `Guitar Clone Web`) |
+| Repositório | <https://github.com/Kaio-AH/Guitar-Clone-Web> (público) |
 
-### PowerShell
+Integrantes:
 
-```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\pygame-client
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe main.py --demo
-```
+| # | Nome completo | RA |
+| --- | --- | --- |
+| 1 | Kaio Alcantara Henriques | 82610454 |
+| 2 | Rafael Correia Ziroldo | 825151686 |
+| 3 | Gustavo Felipe | 8261104111 |
+| 4 | Renan Santos de Brito | 8261104906 |
+| 5 | Gabriel Lourenço | 8261112697 |
+| 6 | Murillo Rossetti Vieira | 826185996 |
+| 7 | Pedro Andrade Dionísio da Silva | 8261103786 |
 
-### WSL
-
-```bash
-cd ~/guitar-clone-web/pygame-client
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python main.py --demo
-```
-
-Para o jogo completo (busca Spotify + download YouTube), siga as seções do
-backend e do cliente abaixo.
+> O professor autorizou a inclusão de um 7º integrante, como exceção ao limite
+> de 6 indicado no enunciado.
 
 ---
 
-## Requisitos
+## 2. Descrição
+
+O Guitar Clone coloca o jogador diante de uma “setlist”: ele pode buscar uma
+música no Spotify, enviar um arquivo de áudio local ou usar a faixa demo original
+`Neon Drive`, gerada pelo próprio jogo. O backend baixa o áudio, analisa batidas e
+alturas com `librosa` e transforma isso em notas `tap` e `hold` na pista. Acertos
+no tempo correto aumentam o combo e o multiplicador; erros quebram o combo. Ao
+fim da música aparece a pontuação, a precisão, o maior combo e uma nota de S a F.
+
+**Premissa:** você é o guitarrista de uma apresentação e precisa conduzir a música
+até o final, seguindo a chart gerada a partir da faixa escolhida. O conflito é o
+tempo: cada nota passa em um instante exato e exige a tecla certa na hora certa.
+
+Essa premissa aparece no jogo de forma mínima, por meio do tema da faixa e do
+desfecho mostrado na tela de resultados.
+
+---
+
+## 3. Como rodar
+
+### 3.1 Pré-requisitos
 
 | Ferramenta | Versão | Para quê |
 | --- | --- | --- |
@@ -57,68 +78,9 @@ backend e do cliente abaixo.
 O backend escuta em `http://127.0.0.1:5000` (bind `0.0.0.0:5000`), o frontend
 Vite em `http://localhost:5173` e o cliente PyGame consome a API na porta 5000.
 
----
+### 3.2 Instalação
 
-## 1. Configurar as credenciais do Spotify
-
-Crie um app em <https://developer.spotify.com/dashboard> e use as credenciais
-via variáveis de ambiente. **Nunca comite `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`.**
-
-### Arquivo `backend/.env` (recomendado)
-
-Copie o modelo e preencha:
-
-```powershell
-Copy-Item backend\.env.example backend\.env
-notepad backend\.env
-```
-
-```bash
-cp backend/.env.example backend/.env
-nano backend/.env
-```
-
-Formato do arquivo (uma variável por linha, **sem** `set` na frente):
-
-```dotenv
-SPOTIFY_CLIENT_ID=seu_client_id
-SPOTIFY_CLIENT_SECRET=seu_client_secret
-```
-
-O backend carrega `backend/.env` automaticamente (via `python-dotenv`) e não
-sobrescreve variáveis já definidas no ambiente. O `.env` está no `.gitignore`.
-
-### Variáveis de ambiente (alternativa)
-
-```powershell
-$env:SPOTIFY_CLIENT_ID = "seu_client_id"
-$env:SPOTIFY_CLIENT_SECRET = "seu_client_secret"
-```
-
-Para deixar permanente no usuário:
-
-```powershell
-[Environment]::SetEnvironmentVariable("SPOTIFY_CLIENT_ID", "seu_client_id", "User")
-[Environment]::SetEnvironmentVariable("SPOTIFY_CLIENT_SECRET", "seu_client_secret", "User")
-```
-
-### WSL / Linux (variáveis de ambiente)
-
-```bash
-export SPOTIFY_CLIENT_ID="seu_client_id"
-export SPOTIFY_CLIENT_SECRET="seu_client_secret"
-```
-
-Para deixar permanente, adicione as duas linhas ao final de `~/.bashrc`.
-
-> Sem Spotify configurado o backend sobe normalmente, mas a busca fica
-> desabilitada. Nesse caso use a **demo** (`F2`) ou envie um arquivo local (`U`).
-
----
-
-## 2. Instalar dependências
-
-### PowerShell (Windows)
+#### PowerShell (Windows)
 
 ```powershell
 cd C:\Projetos-Pessoais\guitar-clone-web
@@ -156,7 +118,7 @@ winget install Gyan.FFmpeg
 # ou: choco install ffmpeg
 ```
 
-### WSL (Ubuntu/Debian)
+#### WSL (Ubuntu/Debian)
 
 ```bash
 sudo apt update
@@ -187,14 +149,54 @@ O `yt-dlp` atual precisa de um runtime JS para o YouTube. Instale **Node.js 20+*
 (por exemplo via [nvm](https://github.com/nvm-sh/nvm) ou Nodesource) ou **Deno**
 e garanta que o comando (`node` ou `deno`) esteja no `PATH` do processo do backend.
 
----
+### 3.3 Credenciais do Spotify
 
-## 3. Rodar o backend (Flask)
+Crie um app em <https://developer.spotify.com/dashboard> e use as credenciais
+via variáveis de ambiente. **Nunca comite `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`.**
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+notepad backend\.env
+```
+
+```bash
+cp backend/.env.example backend/.env
+nano backend/.env
+```
+
+```dotenv
+SPOTIFY_CLIENT_ID=seu_client_id
+SPOTIFY_CLIENT_SECRET=seu_client_secret
+```
+
+O backend carrega `backend/.env` automaticamente (via `python-dotenv`) e não
+sobrescreve variáveis já definidas no ambiente. O `.env` está no `.gitignore`.
+Sem Spotify configurado o backend sobe normalmente, mas a busca fica
+desabilitada — nesse caso use a **demo** (`F2`) ou envie um arquivo local (`U`).
+Mais detalhes no **Apêndice A**.
+
+### 3.4 Rodar o jogo
+
+#### Demo local (sem backend, sem internet)
+
+```powershell
+cd C:\Projetos-Pessoais\guitar-clone-web\pygame-client
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py --demo
+```
+
+```bash
+cd ~/guitar-clone-web/pygame-client
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python main.py --demo
+```
+
+#### Jogo completo — terminal 1 (backend)
 
 O backend imprime emojis no console. No Windows, sem `PYTHONIOENCODING=utf-8`,
 ele pode encerrar com `UnicodeEncodeError`.
-
-### PowerShell — terminal 1
 
 ```powershell
 cd C:\Projetos-Pessoais\guitar-clone-web\backend
@@ -203,8 +205,6 @@ $env:SPOTIFY_CLIENT_ID = "seu_client_id"
 $env:SPOTIFY_CLIENT_SECRET = "seu_client_secret"
 .\.venv\Scripts\python.exe guitar-clone-back.py
 ```
-
-### WSL — terminal 1
 
 ```bash
 cd ~/guitar-clone-web/backend
@@ -224,27 +224,14 @@ Invoke-WebRequest http://127.0.0.1:5000/health -UseBasicParsing
 curl http://127.0.0.1:5000/health
 ```
 
-Se a porta 5000 já estiver em uso, encerre o processo antigo antes de subir outro
-backend.
-
----
-
-## 4. Rodar o cliente PyGame
-
-### PowerShell — terminal 2
+#### Jogo completo — terminal 2 (cliente)
 
 ```powershell
 cd C:\Projetos-Pessoais\guitar-clone-web\pygame-client
 .\.venv\Scripts\python.exe main.py
 ```
 
-Atalho equivalente:
-
-```powershell
-.\run.bat
-```
-
-### WSL — terminal 2
+Atalho equivalente: `.\run.bat`.
 
 ```bash
 cd ~/guitar-clone-web/pygame-client
@@ -253,9 +240,9 @@ cd ~/guitar-clone-web/pygame-client
 
 Em Windows 11 com WSL2 + WSLg a janela e o áudio funcionam direto. No Windows 10
 é necessário um servidor X e PulseAudio; nesse caso é mais simples rodar o
-cliente no Windows e deixar o backend no WSL (veja abaixo).
+cliente no Windows e deixar o backend no WSL.
 
-### Opções do cliente
+Opções do cliente:
 
 ```bash
 python main.py --demo                          # demo local, sem backend/internet
@@ -265,25 +252,14 @@ python main.py --headless                      # testes sem janela (SDL dummy)
 
 Também é possível definir `GUITAR_BACKEND_URL` em vez de `--backend`.
 
-### Backend no WSL + cliente no Windows
+Backend no WSL + cliente no Windows:
 
 1. No WSL, suba o backend normalmente (`host='0.0.0.0'`).
-2. No PowerShell:
+2. No PowerShell, rode `main.py --backend http://127.0.0.1:5000`.
+3. O WSL2 faz o encaminhamento de `localhost`; se não funcionar, use o IP do WSL
+   (`ip addr show eth0`) e libere a porta no firewall do Windows.
 
-```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\pygame-client
-.\.venv\Scripts\python.exe main.py --backend http://127.0.0.1:5000
-```
-
-O WSL2 faz o encaminhamento de `localhost` para os serviços Linux. Se não
-funcionar, use o IP do WSL (`ip addr show eth0` dentro do WSL) e libere a porta no
-firewall do Windows.
-
----
-
-## 5. Rodar o frontend React (opcional)
-
-Com o backend rodando:
+#### Frontend React (opcional)
 
 ```powershell
 cd C:\Projetos-Pessoais\guitar-clone-web\frontend
@@ -298,53 +274,28 @@ npm run dev
 Abra <http://localhost:5173>. O frontend usa `http://localhost:5000` como backend
 fixo em `frontend/src/App.jsx`.
 
----
+### 3.5 Modo demo e upload local
 
-## 6. Modo demo e upload local
-
-- **Demo:** `python main.py --demo` ou pressione `F2` na tela de busca. Gera uma
-  faixa e uma chart locais, sem backend.
-- **Upload:** pressione `U` na tela de busca ou arraste um arquivo de áudio
+- **Demo:** `python main.py --demo` ou `F2` na tela de busca. Gera uma faixa e uma
+  chart locais, sem backend.
+- **Upload:** `U` na tela de busca ou arraste um arquivo de áudio
   (`.mp3`, `.wav`, `.ogg`, `.flac`, `.m4a`) sobre a janela.
 - **Spotify:** digite na busca e pressione `ENTER`.
 
-O primeiro download/analise pode demorar (yt-dlp + librosa). Depois o áudio fica
-em cache (`pygame-client/cache/` e a pasta temporária do sistema,
-`guitar_hero_cache`).
+O primeiro download/análise pode demorar (yt-dlp + librosa). Depois o áudio fica
+em cache (`pygame-client/cache/` e na pasta temporária do sistema,
+`guitar_hero_cache`). Logs de falha do cliente ficam em `pygame-client/crash.log`.
+
+### 3.6 Teste em outro computador
+
+**Sim.** Seguimos as instruções deste README em outro computador e a instalação
+e a execução ocorreram sem erros.
 
 ---
 
-## 7. Variáveis de ambiente
+## 4. Controles
 
-| Variável | Padrão | Descrição |
-| --- | --- | --- |
-| `SPOTIFY_CLIENT_ID` | — | Client ID do app Spotify |
-| `SPOTIFY_CLIENT_SECRET` | — | Client Secret do app Spotify |
-| `YT_COOKIES_FILE` | — | Caminho de um `cookies.txt` para o yt-dlp |
-| `YT_COOKIES_BROWSER` | — | Navegador de onde ler cookies (`chrome`, `firefox`, `edge`, `brave`) |
-| `GUITAR_BACKEND_URL` | `http://127.0.0.1:5000` | URL do backend usada pelo cliente PyGame |
-| `PYTHONIOENCODING` | — | Use `utf-8` no Windows para o backend |
-
-Essas variáveis podem vir do ambiente ou de `backend/.env` (veja a seção 1).
-
-Exemplo com cookies do YouTube (quando aparece `HTTP 403: Forbidden`):
-
-```powershell
-$env:YT_COOKIES_BROWSER = "chrome"
-# ou: $env:YT_COOKIES_FILE = "C:\caminho\cookies.txt"
-```
-
-```bash
-export YT_COOKIES_BROWSER="chrome"
-# ou: export YT_COOKIES_FILE="$HOME/cookies.txt"
-```
-
-No WSL, `YT_COOKIES_BROWSER` não enxerga o Chrome do Windows; exporte um
-`cookies.txt` no navegador e use `YT_COOKIES_FILE`.
-
----
-
-## 8. Controles do jogo
+Os controles também aparecem dentro do jogo, na tela **PRONTO PARA TOCAR?**.
 
 | Tela | Tecla | Ação |
 | --- | --- | --- |
@@ -365,31 +316,215 @@ No WSL, `YT_COOKIES_BROWSER` não enxerga o Chrome do Windows; exporte um
 
 ---
 
-## 9. Problemas comuns
+## 5. Regras
+
+**Objetivo:** acertar as notas no instante certo até o fim da música e terminar
+com a maior pontuação/precisão possível. A dificuldade escolhida na busca define
+o número de faixas e a quantidade de notas.
+
+### Como acertar
+
+| Julgamento | Diferença permitida | Pontos por nota |
+| --- | --- | --- |
+| `PERFECT` | até 0,07 s | 200 × multiplicador |
+| `GREAT` | até 0,14 s | 150 × multiplicador |
+| `GOOD` | até 0,25 s | 120 × multiplicador |
+| `HOLD` (nota comprida segura até o fim) | — | 200 × multiplicador |
+| `BROKEN` / `MISS` | fora da janela de 0,26 s | 0 e combo zera |
+
+### Combo e multiplicador
+
+| Combo | Multiplicador |
+| --- | --- |
+| 0–9 | 1× |
+| 10–29 | 2× |
+| 30–49 | 3× |
+| 50+ | 4× |
+
+### Resultado final
+
+A precisão pondera `PERFECT`/`HOLD` como 100%, `GREAT` como 80%, `GOOD` como 60%,
+`BROKEN` como 15% e `MISS` como 0%. A nota final segue os limites:
+
+| Nota | Precisão |
+| --- | --- |
+| S | ≥ 95% |
+| A | ≥ 90% |
+| B | ≥ 80% |
+| C | ≥ 70% |
+| D | ≥ 60% |
+| F | < 60% |
+
+A partida termina quando a música acaba; a tela de resultados ainda oferece
+**JOGAR DE NOVO [R]** e **NOVA MÚSICA [N]**.
+
+**Condição de derrota:** o jogo não possui uma. Não há vidas nem falha: a
+partida termina ao final da faixa e o desempenho é representado pela nota S–F.
+
+---
+
+## 6. Divisão de tarefas
+
+| Integrante (nome completo e RA) | Responsabilidades |
+| --- | --- |
+| `[PREENCHER]` | Cliente PyGame — estados, telas e áudio (`app.py`, `screens.py`, `scene_game.py`) |
+| `[PREENCHER]` | Regras e chart (`gameplay.py`, `chart.py`, `highway.py`, `demo.py`, `sound.py`, `ui.py`) |
+| `[PREENCHER]` | Backend Flask — endpoints, Spotify, YouTube e cache (`backend/guitar-clone-back.py`) |
+| `[PREENCHER]` | Análise de áudio e geração automática da chart (`librosa`) |
+| `[PREENCHER]` | Frontend React opcional (`frontend/`) |
+| `[PREENCHER]` | Documentação, testes, instalação e apresentação |
+
+> Atribuir conforme a participação real. Todos os integrantes devem estar
+> preparados para explicar qualquer parte do código na apresentação.
+
+---
+
+## 7. Créditos
+
+| Recurso | Origem | Autor | Licença |
+| --- | --- | --- | --- |
+| Faixa demo `Neon Drive` e sua chart (`pygame-client/demo.py`) | Criada pelo grupo | Grupo Guitar Clone | Uso próprio do grupo |
+| Efeitos `click` e `finish` (`pygame-client/sound.py`) | Sintetizados pelo grupo | Grupo Guitar Clone | Uso próprio do grupo |
+| Gráficos da pista, HUD, menus e partículas (`ui.py`, `scene_game.py`, `screens.py`, `highway.py`) | Desenhados proceduralmente pelo grupo | Grupo Guitar Clone | Uso próprio do grupo |
+| Capas exibidas na busca | Spotify Web API (via `spotipy`), exibidas diretamente da plataforma | Vários artistas | Termos de uso da Spotify Web API; as imagens não são redistribuídas no repositório |
+| Áudio das músicas no modo online | YouTube (via `yt-dlp`), mantido só em cache local | Vários artistas | Uso estritamente acadêmico; nenhum arquivo é redistribuído |
+
+A música da apresentação ainda não foi definida: a banca escolherá a faixa no
+momento da demonstração. Se uma faixa for escolhida, anotar aqui título, artista e
+link.
+
+Nenhum arquivo de imagem ou áudio de terceiros é versionado neste repositório:
+as capas vêm da API e o áudio baixado permanece apenas no cache da máquina.
+
+---
+
+## 8. Tecnologia
+
+| Camada | Tecnologia | Função |
+| --- | --- | --- |
+| Linguagem principal | Python 3.10+ | lógica do jogo e backend |
+| Jogo | `pygame` | laço principal, entrada, desenho, mixer |
+| Backend | Flask + Flask-CORS | API HTTP em `127.0.0.1:5000` |
+| Músicas | `spotipy` + `yt-dlp` + `ffmpeg` | busca no Spotify, download e conversão |
+| Chart | `librosa` (+ NumPy/SciPy) | beats, onsets, chroma e geração das notas |
+| Cliente HTTP | `requests` | comunicação PyGame → backend |
+| Configuração | `python-dotenv` | leitura de `backend/.env` |
+| Frontend opcional | React + Vite + Tailwind | interface web de busca |
+| Runtime JS | Node.js 20+ (ou Deno) | solver exigido por versões recentes do yt-dlp |
+
+**Escolha tecnológica:** `pygame` foi usado por ser a base vista nas aulas, o que
+facilita a explicação do laço principal, dos estados e dos controles. Flask e
+React aparecem apenas como suporte ao fluxo online (busca, download e análise);
+a lógica do jogo — notas, janelas de acerto, combo, pontuação e telas — é escrita
+pelo grupo no cliente PyGame.
+
+> O grupo optou por manter o pacote `pygame` na versão atualmente instalada e
+> testada, em vez de `pygame-ce`, sugerido no enunciado. A lógica do jogo é a
+> mesma nas duas variantes.
+
+---
+
+## 9. Uso de IA
+
+A implementação e a documentação deste trabalho contaram com apoio de
+inteligência artificial, conforme declarado abaixo.
+
+> **Ferramenta:** OpenCode, com o modelo Big Pickle (assistente de código).  
+> **Finalidade:** apoio na implementação e refatoração do cliente PyGame e do
+> backend Flask, na escrita e revisão da documentação e na investigação/correção
+> de problemas técnicos (por exemplo, o retry da busca no Spotify e o cache de
+> downloads do YouTube).  
+> **Arquivos afetados:** `backend/guitar-clone-back.py`, `pygame-client/*.py`,
+> `README.md`, `backend/README.md`.  
+> Todo o código gerado com apoio de IA foi revisado, executado e testado pelo
+> grupo, que se responsabiliza por explicá-lo e alterá-lo na apresentação.
+
+---
+
+## 10. Capturas de tela
+
+Capturas reais do cliente PyGame em execução (faixa demo `Neon Drive`, 1280×720):
+
+![Partida com pista, notas e HUD](docs/capturas/01-partida.png)
+
+*Partida: pista em perspectiva, notas, HUD com pontos, combo e multiplicador.*
+
+![Tela de resultados com nota S](docs/capturas/02-resultados.png)
+
+*Resultados: nota S, precisão, pontuação, acertos, erros e botão para jogar de novo.*
+
+![Tela PRONTO PARA TOCAR com os controles](docs/capturas/03-pronto-para-tocar.png)
+
+*Antes da partida: teclas de cada faixa e instrução para segurar os holds.*
+
+---
+
+## Apêndice A — Configuração avançada
+
+### Variáveis de ambiente
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `SPOTIFY_CLIENT_ID` | — | Client ID do app Spotify |
+| `SPOTIFY_CLIENT_SECRET` | — | Client Secret do app Spotify |
+| `YT_COOKIES_FILE` | — | Caminho de um `cookies.txt` para o yt-dlp |
+| `YT_COOKIES_BROWSER` | — | Navegador de onde ler cookies (`chrome`, `firefox`, `edge`, `brave`) |
+| `GUITAR_BACKEND_URL` | `http://127.0.0.1:5000` | URL do backend usada pelo cliente PyGame |
+| `PYTHONIOENCODING` | — | Use `utf-8` no Windows para o backend |
+
+Essas variáveis podem vir do ambiente ou de `backend/.env`.
+
+Para deixar as credenciais permanentes no usuário Windows:
+
+```powershell
+[Environment]::SetEnvironmentVariable("SPOTIFY_CLIENT_ID", "seu_client_id", "User")
+[Environment]::SetEnvironmentVariable("SPOTIFY_CLIENT_SECRET", "seu_client_secret", "User")
+```
+
+No WSL/Linux, adicione as duas linhas `export` ao final de `~/.bashrc`.
+
+Exemplo com cookies do YouTube (quando aparece `HTTP 403: Forbidden`):
+
+```powershell
+$env:YT_COOKIES_BROWSER = "chrome"
+# ou: $env:YT_COOKIES_FILE = "C:\caminho\cookies.txt"
+```
+
+```bash
+export YT_COOKIES_BROWSER="chrome"
+# ou: export YT_COOKIES_FILE="$HOME/cookies.txt"
+```
+
+No WSL, `YT_COOKIES_BROWSER` não enxerga o Chrome do Windows; exporte um
+`cookies.txt` no navegador e use `YT_COOKIES_FILE`.
+
+---
+
+## Apêndice B — Problemas comuns
 
 | Sintoma | Causa / solução |
 | --- | --- |
 | `UnicodeEncodeError` no backend | Defina `PYTHONIOENCODING=utf-8` antes de rodar |
 | `HTTP 403: Forbidden` no download | YouTube bloqueando acesso anônimo: configure `YT_COOKIES_FILE`/`YT_COOKIES_BROWSER`, ou use upload/demo |
-| `WinError 5` / `Unable to rename file` | Duas requisições baixavam a mesma música ao mesmo tempo. O backend agora serializa o download e reaproveita o `.mp3` já baixado |
+| `WinError 5` / `Unable to rename file` | Duas requisições baixavam a mesma música ao mesmo tempo. O backend serializa o download e reaproveita o `.mp3` já baixado |
 | Busca retorna erro | Spotify não configurado, credenciais inválidas ou rede instável (o backend tenta 3 vezes; veja `backend/README.md`) |
 | Porta 5000 ocupada | Encerre o processo antigo (`Get-NetTCPConnection -LocalPort 5000` no PowerShell, `lsof -i :5000` no WSL) |
 | Sem áudio no WSL | Verifique WSLg (Windows 11) ou rode o cliente no Windows apontando para o backend no WSL |
 | Janela não abre no WSL | Windows 10 exige X server; prefira Windows 11/WSLg ou rode o cliente no Windows |
 | Sem som em `.m4a`/`.flac` | Instale o `ffmpeg` e confirme que está no `PATH` |
 
-Logs de falha do cliente ficam em `pygame-client/crash.log`.
-
 ---
 
-## 10. Documentação específica
+## Apêndice C — Documentação específica
 
 - `backend/README.md` — funcionamento do backend: endpoints, download do
   YouTube, cache, análise de áudio e geração da chart.
 - `pygame-client/README.md` — detalhes do cliente desktop, estrutura e ajustes.
 - `frontend/README.md` — template padrão do Vite/React.
 
-## Aviso sobre credenciais
+---
+
+## Apêndice D — Aviso sobre credenciais
 
 As credenciais do Spotify são lidas de variáveis de ambiente e nunca devem ser
 commitadas. Se você já expôs um Client Secret em algum commit, gere um novo no
