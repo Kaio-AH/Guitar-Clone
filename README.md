@@ -389,9 +389,12 @@ partida termina ao final da faixa e o desempenho é representado pela nota S–F
 | Capas exibidas na busca | Spotify Web API (via `spotipy`), exibidas diretamente da plataforma | Vários artistas | Termos de uso da Spotify Web API; as imagens não são redistribuídas no repositório |
 | Áudio das músicas no modo online | YouTube (via `yt-dlp`), mantido só em cache local | Vários artistas | Uso estritamente acadêmico; nenhum arquivo é redistribuído |
 
-A música da apresentação ainda não foi definida: a banca escolherá a faixa no
-momento da demonstração. Se uma faixa for escolhida, anotar aqui título, artista e
-link.
+Faixas escolhidas pela banca para a apresentação:
+
+| Faixa | Escolhida por | Fonte / link | Direitos de uso |
+| --- | --- | --- | --- |
+| **Wind of Change** — Scorpions | Profa. Patricia Vitorino Gomes | [Spotify](https://open.spotify.com/search/Wind%20of%20Change%20Scorpions) · [YouTube](https://www.youtube.com/results?search_query=Scorpions+Wind+of+Change) | © Scorpions e gravadora; uso apenas como demonstração acadêmica, sem redistribuição do áudio |
+| **Highway to Hell** — AC/DC | Prof. Fabio Tadeu Doro | [Spotify](https://open.spotify.com/search/Highway%20To%20Hell%20ACDC) · [YouTube](https://www.youtube.com/results?search_query=ACDC+Highway+to+Hell) | © AC/DC e gravadora; uso apenas como demonstração acadêmica, sem redistribuição do áudio |
 
 Nenhum arquivo de imagem ou áudio de terceiros é versionado neste repositório:
 as capas vêm da API e o áudio baixado permanece apenas no cache da máquina.
