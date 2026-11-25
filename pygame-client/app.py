@@ -459,7 +459,7 @@ class App:
             return
         difficulty = self.search.difficulty
         title = os.path.splitext(os.path.basename(path))[0]
-        state = LoadingState(title=title, status="Enviando arquivo para analise...")
+        state = LoadingState(title=title, status="Analisando arquivo local...")
         self.loading = state
         self.state = "loading"
         self.search.focused = False
@@ -473,7 +473,23 @@ class App:
             def cancelled() -> bool:
                 return state.cancelled
 
-            result = self.api.analyze_upload(path, difficulty, on_status, cancelled)
+            if self.offline_mode:
+                from analysis import analyze_audio_file
+
+                result = analyze_audio_file(path, difficulty, on_status=on_status, should_cancel=cancelled)
+                source = "Arquivo local (análise offline)"
+            else:
+                try:
+                    result = self.api.analyze_upload(path, difficulty, on_status, cancelled)
+                    source = "Upload (backend)"
+                except Exception:
+                    # fallback local quando backend online falha
+                    from analysis import analyze_audio_file
+
+                    on_status("Backend indisponível. Analisando localmente com librosa...")
+                    result = analyze_audio_file(path, difficulty, on_status=on_status, should_cancel=cancelled)
+                    source = "Arquivo local (análise offline)"
+
             info = result.get("audio_info", {}) or {}
             playable = _ensure_playable(path)
             return TrackData(
@@ -483,7 +499,7 @@ class App:
                 notes=result.get("notes", []),
                 duration=float(info.get("duration", 0.0) or 0.0),
                 difficulty=difficulty,
-                source="Upload",
+                source=source,
                 tempo=float(info.get("tempo", 0.0) or 0.0),
             )
 

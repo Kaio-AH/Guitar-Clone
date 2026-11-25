@@ -188,13 +188,13 @@ def _draw_empty(surface: pygame.Surface, app) -> None:
     draw_pick(surface, (box.centerx, box.y + 92), 84, ACCENT, (230, 230, 250))
     text(surface, "PROCURE UMA MUSICA PARA COMECAR", 19, TEXT, (box.centerx, box.y + 168), "center", bold=True)
     if app.offline_mode:
-        msg = "Modo offline v1: a busca online e o download do YouTube estão indisponíveis."
-        msg2 = "Pressione F2 ou use o botao DEMO para jogar sem internet."
-        msg3 = "Upload/análise local embutida chegará em uma próxima versão."
+        msg = "Modo offline: busca Spotify/YouTube indisponível, mas upload local funciona."
+        msg2 = "Pressione U para analisar um arquivo local, ou F2 para a demo."
+        msg3 = "A análise local usa librosa embutido nesta v2."
     else:
         msg = "O backend baixa o audio do YouTube e gera a chart automaticamente."
-        msg2 = "Sem internet? Pressione F2 ou use o botao DEMO."
-        msg3 = "Voce tambem pode enviar um arquivo de audio com U."
+        msg2 = "Sem backend? Pressione U para análise local ou F2 para demo."
+        msg3 = "Uploads usam backend quando disponível e caem para análise local se necessário."
     text(surface, msg, 13, MUTED, (box.centerx, box.y + 202), "center")
     text(surface, msg2, 12, ACCENT_3, (box.centerx, box.y + 234), "center", bold=True)
     text(surface, msg3, 11, (105, 108, 136), (box.centerx, box.y + 262), "center")
@@ -209,7 +209,7 @@ def _draw_error(surface: pygame.Surface, app) -> None:
     lines = wrap(app.search.error or "Erro desconhecido.", 13, box.width - 110)
     for index, line in enumerate(lines[:5]):
         text(surface, line, 13, (235, 205, 215), (box.x + 62, box.y + 62 + index * 22))
-    hint = "Modo offline: use F2 (demo)." if app.offline_mode else "Se estiver online, verifique o backend Flask em 127.0.0.1:5000"
+    hint = "Modo offline: use U (arquivo local) ou F2 (demo)." if app.offline_mode else "Se estiver online, verifique o backend Flask em 127.0.0.1:5000"
     text(surface, hint, 11, MUTED, (box.x + 62, box.bottom - 26))
 
 

@@ -46,10 +46,14 @@ class MockBackendAPI:
         )
 
     def analyze_upload(self, path: str, difficulty: str, on_status=None, should_cancel=None) -> dict:
-        raise MockApiError(
-            "Análise de upload indisponível no modo offline nesta v1. "
-            "Use F2 para jogar a demo. A análise local embutida chegará em uma versão futura."
-        )
+        from analysis import LocalAnalysisError, analyze_audio_file
+
+        try:
+            return analyze_audio_file(path, difficulty, on_status=on_status, should_cancel=should_cancel)
+        except LocalAnalysisError as exc:
+            raise MockApiError(str(exc)) from exc
+        except Exception as exc:
+            raise MockApiError(f"Falha ao analisar áudio local: {exc}") from exc
 
     def download_audio(self, cache_id: str, on_progress=None, on_status=None, should_cancel=None) -> str:
         safe_id = re.sub(r"[^A-Za-z0-9_-]", "", str(cache_id))

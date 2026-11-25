@@ -77,12 +77,12 @@ Vite em `http://localhost:5173` e o cliente PyGame consome a API na porta 5000.
 
 ### 3.2 Instalação
 
-#### Opção rápida: executável v1 (Windows)
+#### Opção rápida: executável v2 (Windows)
 
-Na aba [Releases](https://github.com/Kaio-AH/Guitar-Clone/releases), baixe `GuitarClone-v1-windows.zip`, extraia e execute `GuitarClone.exe`.
+Na aba [Releases](https://github.com/Kaio-AH/Guitar-Clone/releases), baixe `GuitarClone-v2-windows.zip`, extraia e execute `GuitarClone.exe`.
 
-- **Offline (v1):** roda sem backend/internet na demo local (`F2` ou botão `DEMO`).
-- **Online (busca Spotify, YouTube, upload com análise):** nesta v1 ainda exige backend rodando; será embutido em versões futuras.
+- **Offline (v2):** roda sem backend/internet. A demo (`F2`) e o **upload de arquivo local (`U`) com análise por librosa** funcionam no próprio executável.
+- **Online (busca Spotify / download YouTube):** ainda exige backend rodando; será embutido em versões futuras.
 - Cache/logs: `%LOCALAPPDATA%\GuitarClone\`.
 
 #### Opção desenvolvedor (código-fonte) — PowerShell (Windows)

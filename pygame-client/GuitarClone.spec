@@ -1,18 +1,29 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 block_cipher = None
 
 hiddenimports = []
 hiddenimports += collect_submodules('pygame')
+hiddenimports += collect_submodules('librosa')
+hiddenimports += collect_submodules('sklearn')
+hiddenimports += collect_submodules('scipy')
+hiddenimports += collect_submodules('soundfile')
+hiddenimports += collect_submodules('numba')
+hiddenimports += collect_submodules('lazy_loader')
+
+datas = []
+datas += collect_data_files('librosa')
+datas += collect_data_files('sklearn')
+datas += collect_data_files('soundfile')
 
 a = Analysis(
     ['main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[],
-    hiddenimports=hiddenimports,
+    datas=datas,
+    hiddenimports=hiddenimports + ['analysis'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
