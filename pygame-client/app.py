@@ -11,6 +11,7 @@ import pygame
 import requests
 
 from api import ApiError, BackendAPI
+from mock_api import MockApiError, MockBackendAPI
 from config import (
     ACCENT,
     ACCENT_2,
@@ -22,9 +23,11 @@ from config import (
     GOLD,
     HEIGHT,
     MUTED,
+    OFFLINE_MODE,
     RED,
     TEXT,
     TITLE,
+    USER_DATA_DIR,
     WIDTH,
 )
 from demo import DEMO_TITLE, ensure_demo
@@ -93,9 +96,13 @@ class TrackData:
     tempo: float = 0.0
 
 
-def friendly_error(exc: BaseException) -> str:
+def friendly_error(exc: BaseException, offline: bool = False) -> str:
+    if isinstance(exc, MockApiError):
+        return str(exc)
     if isinstance(exc, requests.exceptions.ConnectionError):
-        return "Backend offline. Inicie o backend Flask em 127.0.0.1:5000."
+        if offline:
+            return "Modo offline: recursos online indisponíveis. Use F2 (demo) ou arquivos em cache."
+        return "Backend indisponível. Verifique sua conexão ou inicie o backend local."
     if isinstance(exc, requests.exceptions.Timeout):
         return "O backend demorou demais para responder. Tente novamente."
     return str(exc) or exc.__class__.__name__
@@ -162,7 +169,8 @@ class App:
         self.now = 0
         self.headless = headless
 
-        self.api = BackendAPI(backend_url)
+        self.offline_mode = bool(OFFLINE_MODE)
+        self.api = MockBackendAPI() if self.offline_mode else BackendAPI(backend_url)
         self.images = ImageLoader(self.api)
         self.sfx = Sfx()
         self.background = make_background(WIDTH, HEIGHT)
@@ -176,9 +184,9 @@ class App:
         self.game: GameplaySession | None = None
         self.last_track: TrackData | None = None
         self.search_task: ThreadTask | None = None
-        self.health_task = ThreadTask(self.api.health)
+        self.health_task = None if self.offline_mode else ThreadTask(self.api.health)
 
-        self.backend_status = "checking"
+        self.backend_status = "offline" if self.offline_mode else "checking"
         self.music_available = pygame.mixer.get_init() is not None
         self.music_loaded = False
         self.music_started = False
@@ -225,7 +233,7 @@ class App:
 
     def _report_crash(self, exc: BaseException) -> None:
         traceback.print_exc()
-        path = os.path.join(BASE_DIR, "crash.log")
+        path = os.path.join(USER_DATA_DIR, "crash.log")
         try:
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(traceback.format_exc())
@@ -295,14 +303,21 @@ class App:
         self.starfield.update(dt)
         self.toast.time = max(0.0, self.toast.time - dt)
         if self.health_task is not None and self.health_task.done:
-            self.backend_status = "online" if self.health_task.result and not self.health_task.error else "offline"
+            if self.health_task.result and not self.health_task.error:
+                self.backend_status = "online"
+            else:
+                self.backend_status = "offline"
+                # v1: cai para mock local quando o backend online não responde
+                if not self.offline_mode:
+                    self.offline_mode = True
+                    self.api = MockBackendAPI(reason="backend-unreachable")
             self.health_task = None
         if self.search_task is not None and self.search_task.done:
             task = self.search_task
             self.search_task = None
             self.search.searching = False
             if task.error is not None:
-                self.search.error = friendly_error(task.error)
+                self.search.error = friendly_error(task.error, self.offline_mode)
             else:
                 self.search.results = task.result or []
                 self.search.selected = 0
@@ -316,7 +331,7 @@ class App:
             if not state.cancelled:
                 if task.error is not None:
                     self.state = "search"
-                    self.search.error = friendly_error(task.error)
+                    self.search.error = friendly_error(task.error, self.offline_mode)
                     self.search.focused = False
                     pygame.key.stop_text_input()
                 elif task.result is not None:

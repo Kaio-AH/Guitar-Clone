@@ -7,7 +7,7 @@ from typing import Callable
 
 import requests
 
-from config import BACKEND_URL, CACHE_DIR
+from config import BACKEND_URL, CACHE_DIR, OFFLINE_MODE
 
 StatusCb = Callable[[str], None]
 ProgressCb = Callable[[float], None]
@@ -23,6 +23,7 @@ class BackendAPI:
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "GuitarClonePyGame/1.0"})
+        self.offline = bool(OFFLINE_MODE)
 
     def _json(self, response: requests.Response) -> dict:
         try:
@@ -34,6 +35,8 @@ class BackendAPI:
         return data
 
     def health(self) -> dict | None:
+        if self.offline:
+            return None
         try:
             response = self.session.get(f"{self.base_url}/health", timeout=(2.5, 4))
             return response.json()

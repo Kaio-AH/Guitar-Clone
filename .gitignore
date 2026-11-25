@@ -32,3 +32,7 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# PyInstaller (pygame-client)
+pygame-client/build/
+pygame-client/dist/
