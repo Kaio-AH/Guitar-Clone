@@ -1,6 +1,6 @@
 # Guitar Clone
 
-Repositório do projeto: **Guitar Clone Web**.
+Repositório do projeto: **Guitar Clone**.
 
 Jogo de ritmo inspirado em Guitar Hero: notas descem em uma pista de 3 a 5 faixas
 e devem ser acionadas no tempo da música. A chart é gerada automaticamente a
@@ -26,7 +26,7 @@ pygame-client/  cliente desktop em PyGame (jogo completo)
 | Unidade curricular | Usabilidade, desenvolvimento web, mobile e jogos |
 | Professor | Patricia Vitorino Gomes e Fabio Tadeu Doro |
 | Grupo | `Guitar Clone` |
-| Nome provisório do jogo | `Guitar Clone` (o nome técnico do repositório é `Guitar Clone Web`) |
+| Nome do jogo | Guitar Clone |
 | Repositório | <https://github.com/Kaio-AH/Guitar-Clone> (público) |
 
 Integrantes:
