@@ -12,8 +12,8 @@ frontend/       interface web em React + Vite (opcional)
 pygame-client/  cliente desktop em PyGame (jogo completo)
 ```
 
-> Nos comandos abaixo, troque `C:\Projetos-Pessoais\guitar-clone-web` e
-> `~/guitar-clone-web` pelo caminho do seu clone. Os exemplos usam `python`; se
+> Nos comandos abaixo, troque `C:\Projetos-Pessoais\Guitar-Clone` e
+> `~/Guitar-Clone` pelo caminho do seu clone. Os exemplos usam `python`; se
 > você usa o launcher do Windows, pode trocar por `py -3`.
 
 ---
@@ -27,7 +27,7 @@ pygame-client/  cliente desktop em PyGame (jogo completo)
 | Professor | Patricia Vitorino Gomes e Fabio Tadeu Doro |
 | Grupo | `Guitar Clone` |
 | Nome provisório do jogo | `Guitar Clone` (o nome técnico do repositório é `Guitar Clone Web`) |
-| Repositório | <https://github.com/Kaio-AH/Guitar-Clone-Web> (público) |
+| Repositório | <https://github.com/Kaio-AH/Guitar-Clone> (público) |
 
 Integrantes:
 
@@ -80,7 +80,7 @@ Vite em `http://localhost:5173` e o cliente PyGame consome a API na porta 5000.
 #### PowerShell (Windows)
 
 ```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web
+cd C:\Projetos-Pessoais\Guitar-Clone
 
 # backend
 python -m venv backend\.venv
@@ -122,7 +122,7 @@ sudo apt update
 sudo apt install -y python3 python3-venv python3-pip ffmpeg libsndfile1
 
 # prefira clonar/copiar para o filesystem do Linux: /mnt/c é lento para venv
-cd ~/guitar-clone-web
+cd ~/Guitar-Clone
 
 python3 -m venv backend/.venv
 source backend/.venv/bin/activate
@@ -177,14 +177,14 @@ Mais detalhes no **Apêndice A**.
 #### Demo local (sem backend, sem internet)
 
 ```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\pygame-client
+cd C:\Projetos-Pessoais\Guitar-Clone\pygame-client
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe main.py --demo
 ```
 
 ```bash
-cd ~/guitar-clone-web/pygame-client
+cd ~/Guitar-Clone/pygame-client
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python main.py --demo
@@ -196,7 +196,7 @@ O backend imprime emojis no console. No Windows, sem `PYTHONIOENCODING=utf-8`,
 ele pode encerrar com `UnicodeEncodeError`.
 
 ```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\backend
+cd C:\Projetos-Pessoais\Guitar-Clone\backend
 $env:PYTHONIOENCODING = "utf-8"
 $env:SPOTIFY_CLIENT_ID = "seu_client_id"
 $env:SPOTIFY_CLIENT_SECRET = "seu_client_secret"
@@ -204,7 +204,7 @@ $env:SPOTIFY_CLIENT_SECRET = "seu_client_secret"
 ```
 
 ```bash
-cd ~/guitar-clone-web/backend
+cd ~/Guitar-Clone/backend
 export PYTHONIOENCODING=utf-8
 export SPOTIFY_CLIENT_ID="seu_client_id"
 export SPOTIFY_CLIENT_SECRET="seu_client_secret"
@@ -224,14 +224,14 @@ curl http://127.0.0.1:5000/health
 #### Jogo completo — terminal 2 (cliente)
 
 ```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\pygame-client
+cd C:\Projetos-Pessoais\Guitar-Clone\pygame-client
 .\.venv\Scripts\python.exe main.py
 ```
 
 Atalho equivalente: `.\run.bat`.
 
 ```bash
-cd ~/guitar-clone-web/pygame-client
+cd ~/Guitar-Clone/pygame-client
 .venv/bin/python main.py
 ```
 
@@ -259,12 +259,12 @@ Backend no WSL + cliente no Windows:
 #### Frontend React (opcional)
 
 ```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\frontend
+cd C:\Projetos-Pessoais\Guitar-Clone\frontend
 npm run dev
 ```
 
 ```bash
-cd ~/guitar-clone-web/frontend
+cd ~/Guitar-Clone/frontend
 npm run dev
 ```
 

@@ -44,14 +44,14 @@ O cliente roda a requisição de análise em uma thread própria
 ## 2. Como rodar
 
 ```powershell
-cd C:\Projetos-Pessoais\guitar-clone-web\backend
+cd C:\Projetos-Pessoais\Guitar-Clone\backend
 $env:PYTHONIOENCODING = "utf-8"
 .\.venv\Scripts\python.exe guitar-clone-back.py
 ```
 
 ```bash
 # WSL / Linux
-cd ~/guitar-clone-web/backend
+cd ~/Guitar-Clone/backend
 export PYTHONIOENCODING=utf-8
 .venv/bin/python guitar-clone-back.py
 ```
