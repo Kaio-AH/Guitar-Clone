@@ -41,9 +41,6 @@ Integrantes:
 | 6 | Murillo Rossetti Vieira | 826185996 |
 | 7 | Pedro Andrade Dionísio da Silva | 8261103786 |
 
-> O professor autorizou a inclusão de um 7º integrante, como exceção ao limite
-> de 6 indicado no enunciado.
-
 ---
 
 ## 2. Descrição
