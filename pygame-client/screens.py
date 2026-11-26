@@ -53,11 +53,11 @@ STATUS_PILL = pygame.Rect(860, 30, 150, 30)
 CONFIG_BTN = pygame.Rect(1022, 30, 104, 30)
 DEMO_BTN = pygame.Rect(1138, 30, 92, 30)
 
-SETTINGS_BOX = pygame.Rect(220, 110, 840, 500)
-SETTINGS_ID_BOX = pygame.Rect(270, 250, 740, 42)
-SETTINGS_SECRET_BOX = pygame.Rect(270, 340, 740, 42)
-SETTINGS_SAVE_BTN = pygame.Rect(760, 540, 250, 44)
-SETTINGS_CLOSE_BTN = pygame.Rect(640, 540, 104, 44)
+SETTINGS_BOX = pygame.Rect(220, 86, 840, 548)
+SETTINGS_ID_BOX = pygame.Rect(270, 292, 740, 44)
+SETTINGS_SECRET_BOX = pygame.Rect(270, 384, 740, 44)
+SETTINGS_SAVE_BTN = pygame.Rect(760, 570, 250, 44)
+SETTINGS_CLOSE_BTN = pygame.Rect(640, 570, 104, 44)
 DIFF_RECTS = [pygame.Rect(390 + i * 124, 224, 116, 32) for i in range(4)]
 CARD_X, CARD_Y = 60, 300
 CARD_W, CARD_H = 373, 84
@@ -569,8 +569,43 @@ def handle_results_event(app, event: pygame.event.Event) -> None:
             app.back_to_search()
 
 # ------------------------------------------------------------------ settings
+def _clipboard_text() -> str:
+    try:
+        if pygame.scrap.get_init():
+            for t in ("text/plain;charset=utf-8", "text/plain", pygame.SCRAP_TEXT):
+                try:
+                    raw = pygame.scrap.get(t)
+                except Exception:
+                    raw = None
+                if not raw:
+                    continue
+                if isinstance(raw, bytes):
+                    value = raw.decode("utf-8", errors="ignore")
+                else:
+                    value = str(raw)
+                value = value.replace("\x00", "").strip()
+                value = "".join(ch for ch in value if ch.isprintable())
+                if value:
+                    return value
+    except Exception:
+        pass
+    try:
+        import tkinter as tk
+
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            value = root.clipboard_get()
+        finally:
+            root.destroy()
+        value = "".join(ch for ch in str(value).replace("\x00", "").strip() if ch.isprintable())
+        return value
+    except Exception:
+        return ""
+
+
 def _settings_field(surface: pygame.Surface, rect: pygame.Rect, label: str, value: str, active: bool, secret: bool = False) -> None:
-    text(surface, label, 11, MUTED, (rect.x, rect.y - 20), bold=True)
+    text(surface, label, 11, MUTED, (rect.x + 2, rect.y - 22), "topleft", bold=True)
     panel(surface, rect, (12, 13, 22), 10, ACCENT_3 if active else BORDER, 2 if active else 1)
     shown = value
     if secret and value:
@@ -606,7 +641,7 @@ def draw_settings(surface: pygame.Surface, app, now: int) -> None:
         "3. Cole abaixo, clique em SALVAR. O jogo cria/atualiza o .env local automaticamente.",
     ]
     for i, line in enumerate(steps):
-        text(surface, line, 11, (190, 194, 214), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 134 + i * 22), "midleft")
+        text(surface, line, 11, (190, 194, 214), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 132 + i * 22), "midleft")
 
     _settings_field(surface, SETTINGS_ID_BOX, "CLIENT ID", settings.client_id, settings.active_field == "client_id")
     _settings_field(surface, SETTINGS_SECRET_BOX, "CLIENT SECRET", settings.client_secret, settings.active_field == "client_secret", secret=True)
@@ -621,10 +656,10 @@ def draw_settings(surface: pygame.Surface, app, now: int) -> None:
         caret_x = min(caret_x, rect.right - 12)
         pygame.draw.line(surface, ACCENT_3, (caret_x, rect.y + 10), (caret_x, rect.bottom - 10), 2)
 
-    text(surface, f"Arquivo: {env_path}", 10, (120, 124, 150), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 404), "midleft")
-    text(surface, "Dica: Ctrl+V cola. Tab alterna campos. Esc fecha.", 10, (120, 124, 150), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 424), "midleft")
+    text(surface, f"Arquivo: {env_path}", 10, (120, 124, 150), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 448), "midleft")
+    text(surface, "Dica: Ctrl+V cola. Tab alterna campos. Esc fecha.", 10, (120, 124, 150), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 468), "midleft")
     if settings.message:
-        text(surface, settings.message, 11, settings.message_color, (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 452), "midleft", bold=True)
+        text(surface, settings.message, 11, settings.message_color, (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 492), "midleft", bold=True)
 
     close_hover = getattr(app, "hover_settings_close", False)
     save_hover = getattr(app, "hover_settings_save", False)
@@ -685,15 +720,10 @@ def handle_settings_event(app, event: pygame.event.Event) -> None:
         else:
             settings.client_secret = settings.client_secret[:-1]
     elif event.key == pygame.K_v and (mods & pygame.KMOD_CTRL):
-        try:
-            clip = pygame.scrap.get(pygame.SCRAP_TEXT)
-            if clip:
-                text_clip = clip.decode("utf-8", errors="ignore").replace("\x00", "").strip()
-                text_clip = "".join(ch for ch in text_clip if ch.isprintable())
-                if settings.active_field == "client_id":
-                    settings.client_id = (settings.client_id + text_clip)[:200]
-                else:
-                    settings.client_secret = (settings.client_secret + text_clip)[:200]
-        except Exception:
-            pass
+        text_clip = _clipboard_text()
+        if text_clip:
+            if settings.active_field == "client_id":
+                settings.client_id = (settings.client_id + text_clip)[:200]
+            else:
+                settings.client_secret = (settings.client_secret + text_clip)[:200]
 

@@ -165,6 +165,10 @@ class App:
         except Exception:
             pass
         pygame.init()
+        try:
+            pygame.scrap.init()
+        except Exception:
+            pass
         pygame.display.set_caption(TITLE)
         flags = pygame.RESIZABLE
         if not headless:
