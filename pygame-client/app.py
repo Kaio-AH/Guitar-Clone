@@ -425,9 +425,11 @@ class App:
         self.toast = ToastState(message=message, color=color, time=3.4)
 
     def open_settings(self) -> None:
+        import config
+
         self.settings.open = True
-        self.settings.client_id = SPOTIFY_CLIENT_ID
-        self.settings.client_secret = SPOTIFY_CLIENT_SECRET
+        self.settings.client_id = config._clean_credential(config.SPOTIFY_CLIENT_ID, "SPOTIFY_CLIENT_ID")
+        self.settings.client_secret = config._clean_credential(config.SPOTIFY_CLIENT_SECRET, "SPOTIFY_CLIENT_SECRET")
         self.settings.active_field = "client_id"
         self.settings.message = (
             f"Configurado. Salvo em {ENV_FILE}" if spotify_configured() else "Informe as credenciais do seu app Spotify."

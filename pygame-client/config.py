@@ -57,10 +57,18 @@ def spotify_configured() -> bool:
     return bool(SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET)
 
 
+def _clean_credential(value: str, key: str) -> str:
+    v = (value or "").strip().strip('"').strip("'")
+    prefix = f"{key}="
+    if v.upper().startswith(prefix.upper()):
+        v = v[len(prefix):].strip().strip('"').strip("'")
+    return v
+
+
 def save_spotify_credentials(client_id: str, client_secret: str) -> str:
     global SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
-    SPOTIFY_CLIENT_ID = (client_id or "").strip()
-    SPOTIFY_CLIENT_SECRET = (client_secret or "").strip()
+    SPOTIFY_CLIENT_ID = _clean_credential(client_id, "SPOTIFY_CLIENT_ID")
+    SPOTIFY_CLIENT_SECRET = _clean_credential(client_secret, "SPOTIFY_CLIENT_SECRET")
     os.environ["SPOTIFY_CLIENT_ID"] = SPOTIFY_CLIENT_ID
     os.environ["SPOTIFY_CLIENT_SECRET"] = SPOTIFY_CLIENT_SECRET
 
@@ -100,8 +108,8 @@ def _load_env_file(path: str) -> None:
                     os.environ[key] = value
     except OSError:
         return
-    SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", SPOTIFY_CLIENT_ID)
-    SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", SPOTIFY_CLIENT_SECRET)
+    SPOTIFY_CLIENT_ID = _clean_credential(os.environ.get("SPOTIFY_CLIENT_ID", SPOTIFY_CLIENT_ID), "SPOTIFY_CLIENT_ID")
+    SPOTIFY_CLIENT_SECRET = _clean_credential(os.environ.get("SPOTIFY_CLIENT_SECRET", SPOTIFY_CLIENT_SECRET), "SPOTIFY_CLIENT_SECRET")
 
 
 _load_env_file(ENV_FILE)
