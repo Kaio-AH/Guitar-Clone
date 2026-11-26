@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 
 
@@ -44,6 +45,57 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 
 BACKEND_URL = os.environ.get("GUITAR_BACKEND_URL", "http://127.0.0.1:5000").rstrip("/")
 OFFLINE_MODE = os.environ.get("GUITAR_OFFLINE", "").strip().lower() in {"1", "true", "yes", "offline"}
+EMBEDDED_ONLINE = os.environ.get("GUITAR_EMBEDDED_ONLINE", "1").strip().lower() not in {"0", "false", "no"}
+
+# Credenciais Spotify: env tem prioridade; depois .env em USER_DATA_DIR; depois backend/.env (dev)
+SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+ENV_FILE = os.path.join(USER_DATA_DIR, ".env")
+
+
+def _load_env_file(path: str) -> None:
+    global SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError:
+        return
+    SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", SPOTIFY_CLIENT_ID)
+    SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", SPOTIFY_CLIENT_SECRET)
+
+
+_load_env_file(ENV_FILE)
+# dev convenience: reuse backend/.env when running from source
+_load_env_file(os.path.join(os.path.dirname(BASE_DIR), "backend", ".env"))
+
+
+def get_ffmpeg_location() -> str | None:
+    candidates = []
+    env_ffmpeg = os.environ.get("FFMPEG_LOCATION") or os.environ.get("FFMPEG_BINARY")
+    if env_ffmpeg:
+        candidates.append(env_ffmpeg)
+    candidates.append(os.path.join(BASE_DIR, "ffmpeg", "bin"))
+    candidates.append(os.path.join(BASE_DIR, "ffmpeg"))
+    candidates.append(os.path.join(ASSET_DIR, "ffmpeg", "bin"))
+    candidates.append(os.path.join(ASSET_DIR, "ffmpeg"))
+    local = shutil.which("ffmpeg")
+    if local:
+        return os.path.dirname(local)
+    for candidate in candidates:
+        exe = os.path.join(candidate, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        if os.path.isfile(exe):
+            return candidate
+    return None
 
 LANE_KEYS = ["a", "s", "d", "j", "k"]
 LANE_ALT_KEYS = ["1", "2", "3", "4", "5"]

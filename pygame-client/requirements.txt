@@ -1,2 +1,9 @@
-pygame>=2.5.2
+﻿pygame>=2.5.2
 requests>=2.31.0
+librosa>=0.11.0
+soundfile>=0.12.1
+numpy>=1.26
+scipy>=1.11
+spotipy>=2.23
+yt-dlp>=2026.1.1
+python-dotenv>=1.0

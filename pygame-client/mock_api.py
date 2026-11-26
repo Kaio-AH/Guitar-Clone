@@ -33,17 +33,26 @@ class MockBackendAPI:
         }
 
     def search_spotify(self, query: str, limit: int = 12) -> list[dict]:
-        raise MockApiError(
-            "Busca no Spotify indisponível no modo offline. "
-            "Conecte-se à internet e inicie o backend para buscar músicas, "
-            "ou use F2 (demo) / U (arquivo local já analisado em cache)."
-        )
+        from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+
+        if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+            raise MockApiError(
+                "Spotify não configurado. Crie %LOCALAPPDATA%\\GuitarClone\\.env com SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET."
+            )
+        try:
+            from online_service import OnlineServiceError, search_spotify
+
+            return search_spotify(query, limit)
+        except OnlineServiceError as exc:
+            raise MockApiError(str(exc)) from exc
 
     def analyze_youtube(self, query: str, difficulty: str, on_status=None, should_cancel=None) -> dict:
-        raise MockApiError(
-            "Download/análise do YouTube indisponível no modo offline. "
-            "Use F2 para jogar a demo ou conecte o backend online."
-        )
+        try:
+            from online_service import OnlineServiceError, analyze_youtube
+
+            return analyze_youtube(query, difficulty, on_status=on_status, should_cancel=should_cancel)
+        except OnlineServiceError as exc:
+            raise MockApiError(str(exc)) from exc
 
     def analyze_upload(self, path: str, difficulty: str, on_status=None, should_cancel=None) -> dict:
         from analysis import LocalAnalysisError, analyze_audio_file

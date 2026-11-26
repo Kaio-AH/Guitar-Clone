@@ -114,8 +114,13 @@ def _draw_header(surface: pygame.Surface, app, title: str, subtitle: str) -> Non
 
 def _draw_status(surface: pygame.Surface, app) -> None:
     status = app.backend_status
-    color = GREEN if status == "online" else RED if status == "offline" else GOLD
-    label = "ONLINE" if status == "online" else "OFFLINE" if status == "offline" else "CONECTANDO"
+    status_map = {
+        "online": ("ONLINE", GREEN),
+        "embedded": ("ONLINE (EMBUTIDO)", ACCENT_3),
+        "offline": ("OFFLINE", RED),
+        "checking": ("CONECTANDO", GOLD),
+    }
+    label, color = status_map.get(status, ("OFFLINE", RED))
     # Sem pill/borda: fica so o "ping" colorido e o texto.
     draw_glow(surface, color, (STATUS_PILL.x + 15, STATUS_PILL.centery), 14)
     pygame.draw.circle(surface, color, (STATUS_PILL.x + 15, STATUS_PILL.centery), 5)
@@ -187,14 +192,14 @@ def _draw_empty(surface: pygame.Surface, app) -> None:
     panel(surface, box, (10, 11, 20), 18, None)
     draw_pick(surface, (box.centerx, box.y + 92), 84, ACCENT, (230, 230, 250))
     text(surface, "PROCURE UMA MUSICA PARA COMECAR", 19, TEXT, (box.centerx, box.y + 168), "center", bold=True)
-    if app.offline_mode:
+    if app.offline_mode and app.backend_status != "embedded":
         msg = "Modo offline: busca Spotify/YouTube indisponível, mas upload local funciona."
         msg2 = "Pressione U para analisar um arquivo local, ou F2 para a demo."
-        msg3 = "A análise local usa librosa embutido nesta v2."
+        msg3 = "Configure SPOTIFY_CLIENT_ID/SECRET em %LOCALAPPDATA%\\GuitarClone\\.env para habilitar online."
     else:
-        msg = "O backend baixa o audio do YouTube e gera a chart automaticamente."
-        msg2 = "Sem backend? Pressione U para análise local ou F2 para demo."
-        msg3 = "Uploads usam backend quando disponível e caem para análise local se necessário."
+        msg = "Busque no Spotify; o app baixa do YouTube e gera a chart automaticamente."
+        msg2 = "Sem backend externo? O modo embutido usa yt-dlp + ffmpeg + librosa."
+        msg3 = "Pressione U para analisar arquivo local ou F2 para demo."
     text(surface, msg, 13, MUTED, (box.centerx, box.y + 202), "center")
     text(surface, msg2, 12, ACCENT_3, (box.centerx, box.y + 234), "center", bold=True)
     text(surface, msg3, 11, (105, 108, 136), (box.centerx, box.y + 262), "center")

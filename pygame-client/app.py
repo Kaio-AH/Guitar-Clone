@@ -19,6 +19,7 @@ from config import (
     BACKEND_URL,
     BASE_DIR,
     CACHE_DIR,
+    EMBEDDED_ONLINE,
     FPS,
     GOLD,
     HEIGHT,
@@ -170,6 +171,7 @@ class App:
         self.headless = headless
 
         self.offline_mode = bool(OFFLINE_MODE)
+        self.embedded_online = bool(EMBEDDED_ONLINE)
         self.api = MockBackendAPI() if self.offline_mode else BackendAPI(backend_url)
         self.images = ImageLoader(self.api)
         self.sfx = Sfx()
@@ -305,12 +307,12 @@ class App:
         if self.health_task is not None and self.health_task.done:
             if self.health_task.result and not self.health_task.error:
                 self.backend_status = "online"
+                self.offline_mode = False
             else:
-                self.backend_status = "offline"
-                # v1: cai para mock local quando o backend online não responde
-                if not self.offline_mode:
-                    self.offline_mode = True
-                    self.api = MockBackendAPI(reason="backend-unreachable")
+                # v3: se o backend externo não responde, usa serviços embutidos (Spotify/yt-dlp)
+                self.backend_status = "embedded" if self.embedded_online else "offline"
+                self.offline_mode = not self.embedded_online
+                self.api = MockBackendAPI(reason="embedded-online" if self.embedded_online else "offline")
             self.health_task = None
         if self.search_task is not None and self.search_task.done:
             task = self.search_task
