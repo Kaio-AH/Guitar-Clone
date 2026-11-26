@@ -23,6 +23,7 @@ from config import (
     ENV_FILE,
     FPS,
     GOLD,
+    GREEN,
     HEIGHT,
     MUTED,
     OFFLINE_MODE,
