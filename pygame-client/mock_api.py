@@ -33,11 +33,12 @@ class MockBackendAPI:
         }
 
     def search_spotify(self, query: str, limit: int = 12) -> list[dict]:
-        from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+        import config
 
-        if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        if not config.spotify_configured():
             raise MockApiError(
-                "Spotify não configurado. Crie %LOCALAPPDATA%\\GuitarClone\\.env com SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET."
+                "Spotify não configurado. Abra CONFIG no jogo e salve seu Client ID e Client Secret. "
+                "O arquivo será criado em %LOCALAPPDATA%\\GuitarClone\\.env."
             )
         try:
             from online_service import OnlineServiceError, search_spotify

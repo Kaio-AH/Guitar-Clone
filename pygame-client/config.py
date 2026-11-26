@@ -53,6 +53,36 @@ SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 ENV_FILE = os.path.join(USER_DATA_DIR, ".env")
 
 
+def spotify_configured() -> bool:
+    return bool(SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET)
+
+
+def save_spotify_credentials(client_id: str, client_secret: str) -> str:
+    global SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+    SPOTIFY_CLIENT_ID = (client_id or "").strip()
+    SPOTIFY_CLIENT_SECRET = (client_secret or "").strip()
+    os.environ["SPOTIFY_CLIENT_ID"] = SPOTIFY_CLIENT_ID
+    os.environ["SPOTIFY_CLIENT_SECRET"] = SPOTIFY_CLIENT_SECRET
+
+    lines = []
+    if os.path.isfile(ENV_FILE):
+        try:
+            with open(ENV_FILE, "r", encoding="utf-8-sig") as handle:
+                for raw in handle:
+                    if raw.strip().startswith("SPOTIFY_CLIENT_ID=") or raw.strip().startswith("SPOTIFY_CLIENT_SECRET="):
+                        continue
+                    lines.append(raw.rstrip("\n"))
+        except OSError:
+            lines = []
+    while lines and not lines[-1].strip():
+        lines.pop()
+    lines.append(f"SPOTIFY_CLIENT_ID={SPOTIFY_CLIENT_ID}")
+    lines.append(f"SPOTIFY_CLIENT_SECRET={SPOTIFY_CLIENT_SECRET}")
+    with open(ENV_FILE, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    return ENV_FILE
+
+
 def _load_env_file(path: str) -> None:
     global SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
     if not os.path.isfile(path):

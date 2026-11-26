@@ -8,7 +8,8 @@ import threading
 import time
 from typing import Callable
 
-from config import CACHE_DIR, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, get_ffmpeg_location
+import config
+from config import CACHE_DIR, get_ffmpeg_location
 
 StatusCb = Callable[[str], None]
 CancelCb = Callable[[], bool]
@@ -44,7 +45,7 @@ def _valid_cached_audio(path: str) -> bool:
 
 
 def spotify_enabled() -> bool:
-    return bool(SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET)
+    return config.spotify_configured()
 
 
 def _spotify_client():
@@ -53,11 +54,12 @@ def _spotify_client():
 
     if not spotify_enabled():
         raise OnlineServiceError(
-            "Spotify não configurado. Defina SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET em %LOCALAPPDATA%\\GuitarClone\\.env ou nas variáveis de ambiente."
+            "Spotify não configurado. Abra CONFIG no jogo e informe Client ID e Client Secret, "
+            "ou defina-os em %LOCALAPPDATA%\\GuitarClone\\.env."
         )
     mgr = SpotifyClientCredentials(
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
+        client_id=config.SPOTIFY_CLIENT_ID,
+        client_secret=config.SPOTIFY_CLIENT_SECRET,
         requests_timeout=10,
     )
     return spotipy.Spotify(client_credentials_manager=mgr, requests_timeout=10)

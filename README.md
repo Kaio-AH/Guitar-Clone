@@ -83,7 +83,8 @@ Na aba [Releases](https://github.com/Kaio-AH/Guitar-Clone/releases), baixe `Guit
 
 - **Online embutido (v3):** busca no Spotify e download/análise do YouTube funcionam no próprio executável (usa `yt-dlp` + `ffmpeg` embutido + análise local `librosa`).
 - **Offline:** demo (`F2`) e upload/análise local (`U`) continuam funcionando.
-- **Credenciais Spotify:** crie `%LOCALAPPDATA%\GuitarClone\.env` com `SPOTIFY_CLIENT_ID` e `SPOTIFY_CLIENT_SECRET` (modelo: `backend/.env.example`). Sem isso, a busca Spotify fica desabilitada, mas demo/upload local funcionam.
+- **Configurar Spotify no app:** clique em `CONFIG` (ou pressione `C`) na tela de busca. O jogo ensina onde pegar o Client ID/Secret no Spotify Developer Dashboard e salva automaticamente em `%LOCALAPPDATA%\GuitarClone\.env`. Se já existir `.env` com credenciais, o jogo detecta e usa.
+- **Configuração manual (opcional):** crie `%LOCALAPPDATA%\GuitarClone\.env` com `SPOTIFY_CLIENT_ID` e `SPOTIFY_CLIENT_SECRET` (modelo: `backend/.env.example`).
 - Cache/logs: `%LOCALAPPDATA%\GuitarClone\`.
 
 #### Opção desenvolvedor (código-fonte) — PowerShell (Windows)

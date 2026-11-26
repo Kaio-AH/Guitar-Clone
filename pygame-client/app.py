@@ -20,16 +20,21 @@ from config import (
     BASE_DIR,
     CACHE_DIR,
     EMBEDDED_ONLINE,
+    ENV_FILE,
     FPS,
     GOLD,
     HEIGHT,
     MUTED,
     OFFLINE_MODE,
     RED,
+    SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET,
     TEXT,
     TITLE,
     USER_DATA_DIR,
     WIDTH,
+    save_spotify_credentials,
+    spotify_configured,
 )
 from demo import DEMO_TITLE, ensure_demo
 from gameplay import GameplaySession
@@ -83,6 +88,16 @@ class ToastState:
     message: str = ""
     color: tuple[int, int, int] = TEXT
     time: float = 0.0
+
+
+@dataclass
+class SettingsState:
+    open: bool = False
+    client_id: str = ""
+    client_secret: str = ""
+    active_field: str = "client_id"
+    message: str = ""
+    message_color: tuple[int, int, int] = MUTED
 
 
 @dataclass
@@ -182,6 +197,7 @@ class App:
         self.search = SearchState()
         self.loading = LoadingState()
         self.toast = ToastState()
+        self.settings = SettingsState()
         self.state = "search"
         self.game: GameplaySession | None = None
         self.last_track: TrackData | None = None
@@ -195,6 +211,7 @@ class App:
         self.audio_error: str | None = None
 
         self.hover_demo = False
+        self.hover_config = False
         self.hover_difficulty = -1
         self.hover_card = -1
         self.hover_cancel = False
@@ -204,6 +221,8 @@ class App:
         self.hover_pause_menu = False
         self.hover_retry = False
         self.hover_new = False
+        self.hover_settings_save = False
+        self.hover_settings_close = False
 
         self.demo_on_start = demo
         self.demo_title = DEMO_TITLE
@@ -277,6 +296,8 @@ class App:
         self.images.poll()
 
     def _handle_events(self) -> None:
+        from screens import handle_settings_event
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -289,8 +310,11 @@ class App:
                 continue
             if event.type == pygame.DROPFILE:
                 path = getattr(event, "file", "")
-                if self.state == "search" and os.path.splitext(path)[1].lower() in {".mp3", ".wav", ".ogg", ".flac", ".m4a"}:
+                if self.state == "search" and not self.settings.open and os.path.splitext(path)[1].lower() in {".mp3", ".wav", ".ogg", ".flac", ".m4a"}:
                     self.choose_upload(path)
+                continue
+            if self.settings.open:
+                handle_settings_event(self, event)
                 continue
             if self.state == "search":
                 handle_search_event(self, event)
@@ -365,6 +389,8 @@ class App:
             self.finish_game()
 
     def _draw(self, now: int) -> None:
+        from screens import draw_settings
+
         if self.state == "search":
             draw_search(self.screen, self, now)
         elif self.state == "loading":
@@ -373,6 +399,8 @@ class App:
             draw_game(self.screen, self, now)
         elif self.state == "results":
             draw_results(self.screen, self, now)
+        if self.settings.open:
+            draw_settings(self.screen, self, now)
         self._draw_toast()
 
     def _draw_toast(self) -> None:
@@ -390,6 +418,47 @@ class App:
     # ------------------------------------------------------------------ acoes
     def toast_message(self, message: str, color: tuple[int, int, int] = TEXT) -> None:
         self.toast = ToastState(message=message, color=color, time=3.4)
+
+    def open_settings(self) -> None:
+        self.settings.open = True
+        self.settings.client_id = SPOTIFY_CLIENT_ID
+        self.settings.client_secret = SPOTIFY_CLIENT_SECRET
+        self.settings.active_field = "client_id"
+        self.settings.message = (
+            f"Configurado. Salvo em {ENV_FILE}" if spotify_configured() else "Informe as credenciais do seu app Spotify."
+        )
+        self.settings.message_color = GREEN if spotify_configured() else MUTED
+        self.search.focused = False
+        pygame.key.stop_text_input()
+
+    def close_settings(self) -> None:
+        self.settings.open = False
+        self.hover_settings_save = False
+        self.hover_settings_close = False
+
+    def save_settings(self) -> None:
+        client_id = self.settings.client_id.strip()
+        client_secret = self.settings.client_secret.strip()
+        if not client_id or not client_secret:
+            self.settings.message = "Preencha Client ID e Client Secret."
+            self.settings.message_color = RED
+            return
+        try:
+            path = save_spotify_credentials(client_id, client_secret)
+        except OSError as exc:
+            self.settings.message = f"Não foi possível salvar .env: {exc}"
+            self.settings.message_color = RED
+            return
+
+        self.settings.client_id = client_id
+        self.settings.client_secret = client_secret
+        self.settings.message = f"Salvo em {path}. Busca Spotify habilitada."
+        self.settings.message_color = GREEN
+        self.backend_status = "embedded" if self.embedded_online else self.backend_status
+        self.offline_mode = not self.embedded_online and self.backend_status != "online"
+        if self.backend_status != "online":
+            self.api = MockBackendAPI(reason="embedded-online" if self.embedded_online else "offline")
+        self.toast_message("Configuração do Spotify salva.", GREEN)
 
     def do_search(self) -> None:
         query = self.search.query.strip()

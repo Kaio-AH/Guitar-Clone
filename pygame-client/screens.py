@@ -1,4 +1,4 @@
-"""Telas de busca, loading e resultados."""
+﻿"""Telas de busca, loading e resultados."""
 from __future__ import annotations
 
 import math
@@ -49,8 +49,15 @@ SEARCH_PANEL = pygame.Rect(184, 118, 904, 84)
 SEARCH_BOX = pygame.Rect(200, 136, 620, 48)
 SEARCH_BTN = pygame.Rect(832, 136, 112, 48)
 UPLOAD_BTN = pygame.Rect(956, 136, 116, 48)
-STATUS_PILL = pygame.Rect(976, 30, 150, 30)
-DEMO_BTN = pygame.Rect(1140, 30, 92, 30)
+STATUS_PILL = pygame.Rect(860, 30, 150, 30)
+CONFIG_BTN = pygame.Rect(1022, 30, 104, 30)
+DEMO_BTN = pygame.Rect(1138, 30, 92, 30)
+
+SETTINGS_BOX = pygame.Rect(220, 110, 840, 500)
+SETTINGS_ID_BOX = pygame.Rect(270, 250, 740, 42)
+SETTINGS_SECRET_BOX = pygame.Rect(270, 340, 740, 42)
+SETTINGS_SAVE_BTN = pygame.Rect(760, 540, 250, 44)
+SETTINGS_CLOSE_BTN = pygame.Rect(640, 540, 104, 44)
 DIFF_RECTS = [pygame.Rect(390 + i * 124, 224, 116, 32) for i in range(4)]
 CARD_X, CARD_Y = 60, 300
 CARD_W, CARD_H = 373, 84
@@ -101,6 +108,7 @@ def _draw_brand(surface: pygame.Surface) -> None:
 def _draw_topbar(surface: pygame.Surface, app) -> None:
     _draw_brand(surface)
     _draw_status(surface, app)
+    _draw_config_button(surface, app)
     _draw_demo_button(surface, app)
     pygame.draw.line(surface, (34, 36, 54), (0, 100), (WIDTH, 100), 1)
 
@@ -125,6 +133,22 @@ def _draw_status(surface: pygame.Surface, app) -> None:
     draw_glow(surface, color, (STATUS_PILL.x + 15, STATUS_PILL.centery), 14)
     pygame.draw.circle(surface, color, (STATUS_PILL.x + 15, STATUS_PILL.centery), 5)
     text(surface, label, 9, MUTED, (STATUS_PILL.x + 28, STATUS_PILL.centery), "midleft", bold=True)
+
+
+def _draw_config_button(surface: pygame.Surface, app) -> None:
+    selected = getattr(app, "hover_config", False)
+    configured = False
+    try:
+        from config import spotify_configured
+
+        configured = spotify_configured()
+    except Exception:
+        configured = False
+    border = GREEN if configured else (ACCENT_3 if selected else BORDER)
+    panel(surface, CONFIG_BTN, mix_panel(selected), 15, border)
+    label = "SPOTIFY OK" if configured else "CONFIG"
+    color = GREEN if configured else (ACCENT_3 if selected else MUTED)
+    text(surface, label, 10, color, CONFIG_BTN.center, "center", bold=True)
 
 
 def _draw_demo_button(surface: pygame.Surface, app) -> None:
@@ -193,13 +217,13 @@ def _draw_empty(surface: pygame.Surface, app) -> None:
     draw_pick(surface, (box.centerx, box.y + 92), 84, ACCENT, (230, 230, 250))
     text(surface, "PROCURE UMA MUSICA PARA COMECAR", 19, TEXT, (box.centerx, box.y + 168), "center", bold=True)
     if app.offline_mode and app.backend_status != "embedded":
-        msg = "Modo offline: busca Spotify/YouTube indisponível, mas upload local funciona."
+        msg = "Modo offline: busca Spotify/YouTube indisponÃ­vel, mas upload local funciona."
         msg2 = "Pressione U para analisar um arquivo local, ou F2 para a demo."
-        msg3 = "Configure SPOTIFY_CLIENT_ID/SECRET em %LOCALAPPDATA%\\GuitarClone\\.env para habilitar online."
+        msg3 = "Clique em CONFIG para salvar suas credenciais Spotify no .env local."
     else:
         msg = "Busque no Spotify; o app baixa do YouTube e gera a chart automaticamente."
         msg2 = "Sem backend externo? O modo embutido usa yt-dlp + ffmpeg + librosa."
-        msg3 = "Pressione U para analisar arquivo local ou F2 para demo."
+        msg3 = "Clique em CONFIG para informar Client ID/Secret se a busca estiver indisponÃ­vel."
     text(surface, msg, 13, MUTED, (box.centerx, box.y + 202), "center")
     text(surface, msg2, 12, ACCENT_3, (box.centerx, box.y + 234), "center", bold=True)
     text(surface, msg3, 11, (105, 108, 136), (box.centerx, box.y + 262), "center")
@@ -264,7 +288,7 @@ def draw_search(surface: pygame.Surface, app, now: int) -> None:
     state = app.search
     text(surface, "SUAS FAIXAS", 9, MUTED, (60, 282), "midleft", bold=True)
     if state.results:
-        text(surface, f"{len(state.results)} resultados  ·  setas para navegar  ·  ENTER para jogar", 9, (105, 108, 136), (150, 282), "midleft")
+        text(surface, f"{len(state.results)} resultados  Â·  setas para navegar  Â·  ENTER para jogar", 9, (105, 108, 136), (150, 282), "midleft")
     elif state.searching:
         text(surface, "BUSCANDO...", 9, ACCENT_3, (150, 282), "midleft", bold=True)
     else:
@@ -282,7 +306,7 @@ def draw_search(surface: pygame.Surface, app, now: int) -> None:
 
     text(
         surface,
-        "ENTER jogar  ·  setas navegar  ·  U upload  ·  F2 demo  ·  F11 tela cheia",
+        "ENTER jogar  Â·  setas navegar  Â·  U upload  Â·  F2 demo  Â·  F11 tela cheia",
         9,
         (90, 94, 120),
         (WIDTH // 2, 702),
@@ -299,6 +323,7 @@ def handle_search_event(app, event: pygame.event.Event) -> None:
     state = app.search
     if event.type == pygame.MOUSEMOTION:
         pos = event.pos
+        app.hover_config = CONFIG_BTN.collidepoint(pos)
         app.hover_demo = DEMO_BTN.collidepoint(pos)
         app.hover_difficulty = next((i for i, rect in enumerate(DIFF_RECTS) if rect.collidepoint(pos)), -1)
         app.hover_card = next(
@@ -318,6 +343,8 @@ def handle_search_event(app, event: pygame.event.Event) -> None:
             app.do_search()
         elif UPLOAD_BTN.collidepoint(pos):
             app.choose_upload()
+        elif CONFIG_BTN.collidepoint(pos):
+            app.open_settings()
         elif DEMO_BTN.collidepoint(pos):
             app.start_demo()
         elif any(rect.collidepoint(pos) for rect in DIFF_RECTS):
@@ -369,6 +396,8 @@ def handle_search_event(app, event: pygame.event.Event) -> None:
         pygame.key.start_text_input()
     elif event.key == pygame.K_u:
         app.choose_upload()
+    elif event.key == pygame.K_c:
+        app.open_settings()
     elif event.key == pygame.K_F2:
         app.start_demo()
     elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
@@ -538,3 +567,133 @@ def handle_results_event(app, event: pygame.event.Event) -> None:
             app.restart_game()
         elif event.key in (pygame.K_n, pygame.K_ESCAPE):
             app.back_to_search()
+
+# ------------------------------------------------------------------ settings
+def _settings_field(surface: pygame.Surface, rect: pygame.Rect, label: str, value: str, active: bool, secret: bool = False) -> None:
+    text(surface, label, 11, MUTED, (rect.x, rect.y - 20), bold=True)
+    panel(surface, rect, (12, 13, 22), 10, ACCENT_3 if active else BORDER, 2 if active else 1)
+    shown = value
+    if secret and value:
+        shown = ("*" * max(0, len(value) - 4)) + value[-4:]
+    if not shown:
+        shown = "Cole ou digite aqui"
+        color = (92, 95, 120)
+    else:
+        color = TEXT
+    text(surface, truncate(shown, 14, rect.width - 24), 14, color, (rect.x + 12, rect.centery), "midleft")
+
+
+def draw_settings(surface: pygame.Surface, app, now: int) -> None:
+    settings = app.settings
+    dim(surface, 170)
+    panel(surface, SETTINGS_BOX, (10, 11, 20), 20, ACCENT_3, 2)
+    text(surface, "CONFIGURAR SPOTIFY", 28, TEXT, (SETTINGS_BOX.centerx, SETTINGS_BOX.y + 42), "center", bold=True)
+    text(surface, "Suas credenciais ficam salvas apenas neste computador.", 12, MUTED, (SETTINGS_BOX.centerx, SETTINGS_BOX.y + 74), "center")
+    try:
+        from config import ENV_FILE, spotify_configured
+        configured = spotify_configured()
+        env_path = ENV_FILE
+    except Exception:
+        configured = False
+        env_path = "%LOCALAPPDATA%\\GuitarClone\\.env"
+    status = "CONFIGURADO" if configured else "NAO CONFIGURADO"
+    status_color = GREEN if configured else ORANGE
+    text(surface, status, 12, status_color, (SETTINGS_BOX.centerx, SETTINGS_BOX.y + 100), "center", bold=True)
+
+    steps = [
+        "1. Abra https://developer.spotify.com/dashboard e entre com sua conta Spotify.",
+        "2. Crie um app (ou abra um existente) e copie Client ID e Client Secret.",
+        "3. Cole abaixo, clique em SALVAR. O jogo cria/atualiza o .env local automaticamente.",
+    ]
+    for i, line in enumerate(steps):
+        text(surface, line, 11, (190, 194, 214), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 134 + i * 22), "midleft")
+
+    _settings_field(surface, SETTINGS_ID_BOX, "CLIENT ID", settings.client_id, settings.active_field == "client_id")
+    _settings_field(surface, SETTINGS_SECRET_BOX, "CLIENT SECRET", settings.client_secret, settings.active_field == "client_secret", secret=True)
+
+    if settings.active_field in {"client_id", "client_secret"} and (now // 480) % 2 == 0:
+        rect = SETTINGS_ID_BOX if settings.active_field == "client_id" else SETTINGS_SECRET_BOX
+        value = settings.client_id if settings.active_field == "client_id" else settings.client_secret
+        shown = value
+        if settings.active_field == "client_secret" and value:
+            shown = ("*" * max(0, len(value) - 4)) + value[-4:]
+        caret_x = rect.x + 12 + font(14).size(truncate(shown, 14, rect.width - 24))[0] + 1
+        caret_x = min(caret_x, rect.right - 12)
+        pygame.draw.line(surface, ACCENT_3, (caret_x, rect.y + 10), (caret_x, rect.bottom - 10), 2)
+
+    text(surface, f"Arquivo: {env_path}", 10, (120, 124, 150), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 404), "midleft")
+    text(surface, "Dica: Ctrl+V cola. Tab alterna campos. Esc fecha.", 10, (120, 124, 150), (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 424), "midleft")
+    if settings.message:
+        text(surface, settings.message, 11, settings.message_color, (SETTINGS_BOX.x + 50, SETTINGS_BOX.y + 452), "midleft", bold=True)
+
+    close_hover = getattr(app, "hover_settings_close", False)
+    save_hover = getattr(app, "hover_settings_save", False)
+    panel(surface, SETTINGS_CLOSE_BTN, (28, 22, 42) if close_hover else PANEL, 12, ACCENT if close_hover else BORDER, 2)
+    text(surface, "FECHAR", 12, TEXT if close_hover else MUTED, SETTINGS_CLOSE_BTN.center, "center", bold=True)
+    gradient_button(surface, SETTINGS_SAVE_BTN, (168, 85, 247), (219, 39, 119), 12)
+    if save_hover:
+        neon_border(surface, SETTINGS_SAVE_BTN, (255, 255, 255), 12)
+    text(surface, "SALVAR CREDENCIAIS", 12, (255, 255, 255), SETTINGS_SAVE_BTN.center, "center", bold=True)
+
+
+def handle_settings_event(app, event: pygame.event.Event) -> None:
+    settings = app.settings
+    if event.type == pygame.MOUSEMOTION:
+        app.hover_settings_close = SETTINGS_CLOSE_BTN.collidepoint(event.pos)
+        app.hover_settings_save = SETTINGS_SAVE_BTN.collidepoint(event.pos)
+        return
+
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        pos = event.pos
+        if SETTINGS_ID_BOX.collidepoint(pos):
+            settings.active_field = "client_id"
+            pygame.key.start_text_input()
+        elif SETTINGS_SECRET_BOX.collidepoint(pos):
+            settings.active_field = "client_secret"
+            pygame.key.start_text_input()
+        elif SETTINGS_CLOSE_BTN.collidepoint(pos):
+            app.close_settings()
+        elif SETTINGS_SAVE_BTN.collidepoint(pos):
+            app.save_settings()
+        elif not SETTINGS_BOX.collidepoint(pos):
+            app.close_settings()
+        return
+
+    if event.type == pygame.TEXTINPUT:
+        addition = "".join(ch for ch in event.text if ch.isprintable())
+        if not addition:
+            return
+        if settings.active_field == "client_id":
+            settings.client_id = (settings.client_id + addition)[:200]
+        else:
+            settings.client_secret = (settings.client_secret + addition)[:200]
+        return
+
+    if event.type != pygame.KEYDOWN:
+        return
+
+    mods = event.mod
+    if event.key == pygame.K_ESCAPE:
+        app.close_settings()
+    elif event.key == pygame.K_TAB:
+        settings.active_field = "client_secret" if settings.active_field == "client_id" else "client_id"
+    elif event.key == pygame.K_RETURN:
+        app.save_settings()
+    elif event.key == pygame.K_BACKSPACE:
+        if settings.active_field == "client_id":
+            settings.client_id = settings.client_id[:-1]
+        else:
+            settings.client_secret = settings.client_secret[:-1]
+    elif event.key == pygame.K_v and (mods & pygame.KMOD_CTRL):
+        try:
+            clip = pygame.scrap.get(pygame.SCRAP_TEXT)
+            if clip:
+                text_clip = clip.decode("utf-8", errors="ignore").replace("\x00", "").strip()
+                text_clip = "".join(ch for ch in text_clip if ch.isprintable())
+                if settings.active_field == "client_id":
+                    settings.client_id = (settings.client_id + text_clip)[:200]
+                else:
+                    settings.client_secret = (settings.client_secret + text_clip)[:200]
+        except Exception:
+            pass
+
